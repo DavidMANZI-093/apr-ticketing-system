@@ -19,11 +19,18 @@ enum UserRole {
   DEV
 }
 
+enum TicketState {
+  PENDING
+  PAID
+  USED
+  CANCELLED
+}
+
 // User model - represents users with administrative roles only
 model User {
   id        String   @id @default(uuid()) @db.Uuid
   name      String   @db.VarChar(255)
-  email     String   @db.VarChar(255) @unique
+  email     String   @unique @db.VarChar(255)
   password  String   @db.VarChar(255)
   role      UserRole @default(ADMIN)
   createdAt DateTime @default(now())
@@ -41,30 +48,39 @@ model Event {
   active      Boolean  @default(false)
   updatedAt   DateTime @default(now()) @updatedAt
 
-  @@map("events")
+  teams   Team[]
+  tickets Ticket[]
 
-  teams       Team[]
-  tickets     Ticket[]
+  @@map("events")
 }
 
 model Team {
   id          String   @id @default(uuid()) @db.Uuid
-  name        String   @db.VarChar(255) @unique
+  name        String   @unique @db.VarChar(255)
   description String   @db.VarChar(1020)
   logoUrl     String   @db.VarChar(255)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
 
-  eventId     String   @db.Uuid
-  event       Event    @relation(fields: [eventId], references: [id])
+  eventId String @db.Uuid
+  event   Event  @relation(fields: [eventId], references: [id])
+
+  tickets Ticket[]
 }
 
 model Ticket {
-  id        String   @id @default(uuid()) @db.Uuid
-  client    Json     @db.JsonB
-  createdAt DateTime @default(now())
-  updatedAt DateTime @default(now()) @updatedAt
-  
-  eventId   String   @db.Uuid
-  event     Event    @relation(fields: [eventId], references: [id])
+  id        String      @id @default(uuid()) @db.Uuid
+  client    Json        @db.JsonB
+  teamId    String      @db.Uuid
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @default(now()) @updatedAt
+  expiresAt DateTime
+  seatId    String      @db.Uuid
+  state     TicketState @default(PENDING)
+
+  eventId String @db.Uuid
+  event   Event  @relation(fields: [eventId], references: [id])
+  team   Team   @relation(fields: [teamId], references: [id])
+
+  @@unique([seatId, eventId])
 }

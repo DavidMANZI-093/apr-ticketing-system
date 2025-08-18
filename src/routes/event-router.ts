@@ -1,6 +1,11 @@
 import { z } from "zod";
 import { t } from "../controllers/trpc";
 import { prisma } from "../controllers/prisma";
+import { TicketState } from "../../generated/prisma";
+import { v5 as uuidv5 } from "uuid";
+import dotenv from "dotenv";
+import { SeatingPlan } from "../types";
+dotenv.config();
 
 export const eventRouter = t.router({
 	// Create Event
@@ -27,6 +32,8 @@ export const eventRouter = t.router({
 									seats: z.array(
 										z.object({
 											number: z.number().min(1), // Seat number must be at least 1
+											price: z.number().min(0),
+											isAvailable: z.boolean().default(true),
 										}),
 									),
 								}),
@@ -53,7 +60,22 @@ export const eventRouter = t.router({
 							name: input.name,
 							description: input.description,
 							location: input.location,
-							seatingPlan: input.seatingPlan,
+							seatingPlan: input.seatingPlan.sections.reduce((seatMap, section) => {
+								section.rows.forEach((row) => {
+									row.seats.forEach((seat) => {
+										if (!process.env.SEAT_NAMESPACE) { // Namespace UUID for seat ID generation
+											throw new Error("SEAT_NAMESPACE is not defined");
+										}
+										const seatId = uuidv5(`${section.name}${row.number}-${seat.number}`, process.env.SEAT_NAMESPACE as string);
+										seatMap[seatId] = {
+											label: `${section.name}${row.number}-${seat.number}`,
+											price: seat.price,
+											isAvailable: seat.isAvailable
+										};
+									});
+								});
+								return seatMap;
+							}, {} as Record<string, SeatingPlan>) as any,
 							startsAt: input.startsAt,
 							active: true,
 							teams: {
@@ -81,7 +103,35 @@ export const eventRouter = t.router({
 			}
 		}),
 
-	// Get Events
+	// Get All Events
+	getAllEvents: t.procedure.query(async () => {
+		try {
+			return await prisma.$transaction(async (tx) => {
+				const events = await tx.event.findMany();
+				if (events) {
+					return {
+						success: true,
+						message: "Events retrieved successfully",
+						events,
+					}
+				} else {
+					return {
+						success: true,
+						message: "No events found",
+						events: [],
+					}
+				}
+			})
+		} catch (error) {
+			return {
+				success: false,
+				message: "Failed to retrieve events",
+				error: error as string,
+			};
+		}
+	}),
+
+	// Get Events - Active only
 	getEvents: t.procedure.query(async () => {
 		try {
 			return await prisma.$transaction(async (tx) => {
@@ -93,7 +143,7 @@ export const eventRouter = t.router({
 				if (events) {
 					return {
 						success: true,
-						message: "Events retrieved successfully",
+						message: "Events retrieved successfully (active only)",
 						events,
 					};
 				} else {
@@ -244,4 +294,79 @@ export const eventRouter = t.router({
 				};
 			}
 		}),
+
+	// Get Event Status
+	getEventStatus: t.procedure
+		.input(
+			z.object({
+				id: z.string(),
+			})
+		)
+		.query(async ({ input }) => {
+			try {
+				return await prisma.$transaction(async (tx) => {
+					const event = await tx.event.findUnique({
+						where: {
+							id: input.id,
+							active: true,
+						},
+					});
+
+					if (!event) {
+						return {
+							success: false,
+							message: "Event not found or inactive",
+							event: null,
+						};
+					}
+
+					const tickets = await tx.ticket.findMany({
+						where: {
+							eventId: input.id,
+						},
+					});
+
+					const seatingPlan = event.seatingPlan as unknown as Record<string, SeatingPlan>;
+					const totalSeats = Object.keys(seatingPlan).length;
+					
+					const ticketsByState = {
+						pending: tickets.filter(t => t.state === TicketState.PENDING).length,
+						paid: tickets.filter(t => t.state === TicketState.PAID).length,
+						used: tickets.filter(t => t.state === TicketState.USED).length,
+						cancelled: tickets.filter(t => t.state === TicketState.CANCELLED).length,
+					};
+
+					const activeTickets = ticketsByState.pending + ticketsByState.paid + ticketsByState.used;
+					const revenue = tickets
+						.filter(t => t.state === TicketState.PAID || t.state === TicketState.USED)
+						.reduce((sum, ticket) => {
+							const seat = seatingPlan[ticket.seatId];
+							return sum + (seat?.price || 0);
+						}, 0);
+
+					return {
+						success: true,
+						message: "Event status retrieved successfully",
+						event: {
+							...event,
+							stats: {
+								seats: {
+									total: totalSeats,
+									available: totalSeats - activeTickets,
+									reserved: activeTickets,
+								},
+								tickets: ticketsByState,
+								revenue: revenue,
+							}
+						}
+					};
+				});
+			} catch (error) {
+				return {
+					success: false,
+					message: "Failed to retrieve event status",
+					error: error as string,
+				};
+			}
+		})
 });
