@@ -5,7 +5,7 @@ import { TicketState } from "../../generated/prisma";
 import { v5 as uuidv5 } from "uuid";
 import dotenv from "dotenv";
 import { SeatingPlan } from "../types";
-import { id } from "zod/v4/locales/index.cjs";
+import { logger } from "../utils/logger";
 dotenv.config();
 
 export const eventRouter = t.router({
@@ -61,22 +61,29 @@ export const eventRouter = t.router({
 							name: input.name,
 							description: input.description,
 							location: input.location,
-							seatingPlan: input.seatingPlan.sections.reduce((seatMap, section) => {
-								section.rows.forEach((row) => {
-									row.seats.forEach((seat) => {
-										if (!process.env.SEAT_NAMESPACE) { // Namespace UUID for seat ID generation
-											throw new Error("SEAT_NAMESPACE is not defined");
-										}
-										const seatId = uuidv5(`${section.name}${row.number}-${seat.number}`, process.env.SEAT_NAMESPACE as string);
-										seatMap[seatId] = {
-											label: `${section.name}${row.number}-${seat.number}`,
-											price: seat.price,
-											isAvailable: seat.isAvailable
-										};
+							seatingPlan: input.seatingPlan.sections.reduce(
+								(seatMap, section) => {
+									section.rows.forEach((row) => {
+										row.seats.forEach((seat) => {
+											if (!process.env.SEAT_NAMESPACE) {
+												// Namespace UUID for seat ID generation
+												throw new Error("SEAT_NAMESPACE is not defined");
+											}
+											const seatId = uuidv5(
+												`${section.name}${row.number}-${seat.number}`,
+												process.env.SEAT_NAMESPACE as string,
+											);
+											seatMap[seatId] = {
+												label: `${section.name}${row.number}-${seat.number}`,
+												price: seat.price,
+												isAvailable: seat.isAvailable,
+											};
+										});
 									});
-								});
-								return seatMap;
-							}, {} as Record<string, SeatingPlan>) as any,
+									return seatMap;
+								},
+								{} as Record<string, SeatingPlan>,
+							) as any,
 							startsAt: input.startsAt,
 							active: true,
 							teams: {
@@ -96,10 +103,15 @@ export const eventRouter = t.router({
 					}
 				});
 			} catch (error) {
+				logger.error("Failed to create event", error, {
+					operation: "createEvent",
+					eventName: input.name,
+					location: input.location,
+				});
 				return {
 					success: false,
 					message: "Failed to create event",
-					error: error as string,
+					error: error instanceof Error ? error.message : "Unknown error",
 				};
 			}
 		}),
@@ -114,20 +126,23 @@ export const eventRouter = t.router({
 						success: true,
 						message: "Events retrieved successfully",
 						events,
-					}
+					};
 				} else {
 					return {
 						success: true,
 						message: "No events found",
 						events: [],
-					}
+					};
 				}
-			})
+			});
 		} catch (error) {
+			logger.error("Failed to retrieve all events", error, {
+				operation: "getAllEvents",
+			});
 			return {
 				success: false,
 				message: "Failed to retrieve events",
-				error: error as string,
+				error: error instanceof Error ? error.message : "Unknown error",
 			};
 		}
 	}),
@@ -156,10 +171,13 @@ export const eventRouter = t.router({
 				}
 			});
 		} catch (error) {
+			logger.error("Failed to retrieve active events", error, {
+				operation: "getEvents",
+			});
 			return {
 				success: false,
 				message: "Failed to retrieve events",
-				error: error as string,
+				error: error instanceof Error ? error.message : "Unknown error",
 			};
 		}
 	}),
@@ -195,10 +213,14 @@ export const eventRouter = t.router({
 					}
 				});
 			} catch (error) {
+				logger.error("Failed to retrieve event", error, {
+					operation: "getEvent",
+					eventId: input.id,
+				});
 				return {
 					success: false,
 					message: "Failed to retrieve event",
-					error: error as string,
+					error: error instanceof Error ? error.message : "Unknown error",
 				};
 			}
 		}),
@@ -288,10 +310,15 @@ export const eventRouter = t.router({
 					}
 				});
 			} catch (error) {
+				logger.error("Failed to update event", error, {
+					operation: "updateEvent",
+					eventId: input.id,
+					updateFields: Object.keys(input).filter(key => key !== 'id'),
+				});
 				return {
 					success: false,
 					message: "Failed to update event",
-					error: error as string,
+					error: error instanceof Error ? error.message : "Unknown error",
 				};
 			}
 		}),
@@ -301,7 +328,7 @@ export const eventRouter = t.router({
 		.input(
 			z.object({
 				id: z.string(),
-			})
+			}),
 		)
 		.query(async ({ input }) => {
 			try {
@@ -327,19 +354,28 @@ export const eventRouter = t.router({
 						},
 					});
 
-					const seatingPlan = event.seatingPlan as unknown as Record<string, SeatingPlan>;
+					const seatingPlan = event.seatingPlan as unknown as Record<
+						string,
+						SeatingPlan
+					>;
 					const totalSeats = Object.keys(seatingPlan).length;
-					
+
 					const ticketsByState = {
-						pending: tickets.filter(t => t.state === TicketState.PENDING).length,
-						paid: tickets.filter(t => t.state === TicketState.PAID).length,
-						used: tickets.filter(t => t.state === TicketState.USED).length,
-						cancelled: tickets.filter(t => t.state === TicketState.CANCELLED).length,
+						pending: tickets.filter((t) => t.state === TicketState.PENDING)
+							.length,
+						paid: tickets.filter((t) => t.state === TicketState.PAID).length,
+						used: tickets.filter((t) => t.state === TicketState.USED).length,
+						cancelled: tickets.filter((t) => t.state === TicketState.CANCELLED)
+							.length,
 					};
 
-					const activeTickets = ticketsByState.pending + ticketsByState.paid + ticketsByState.used;
+					const activeTickets =
+						ticketsByState.pending + ticketsByState.paid + ticketsByState.used;
 					const revenue = tickets
-						.filter(t => t.state === TicketState.PAID || t.state === TicketState.USED)
+						.filter(
+							(t) =>
+								t.state === TicketState.PAID || t.state === TicketState.USED,
+						)
 						.reduce((sum, ticket) => {
 							const seat = seatingPlan[ticket.seatId];
 							return sum + (seat?.price || 0);
@@ -358,15 +394,19 @@ export const eventRouter = t.router({
 								},
 								tickets: ticketsByState,
 								revenue: revenue,
-							}
-						}
+							},
+						},
 					};
 				});
 			} catch (error) {
+				logger.error("Failed to retrieve event status", error, {
+					operation: "getEventStatus",
+					eventId: input.id,
+				});
 				return {
 					success: false,
 					message: "Failed to retrieve event status",
-					error: error as string,
+					error: error instanceof Error ? error.message : "Unknown error",
 				};
 			}
 		}),
@@ -376,7 +416,7 @@ export const eventRouter = t.router({
 		.input(
 			z.object({
 				id: z.string(),
-			})
+			}),
 		)
 		.mutation(async ({ input }) => {
 			try {
@@ -387,23 +427,27 @@ export const eventRouter = t.router({
 						},
 						data: {
 							active: false,
-						}
-					})
+						},
+					});
 
 					if (event) {
 						return {
 							success: true,
 							message: "Event cancelled successfully",
 							event,
-						}
+						};
 					}
-				})
+				});
 			} catch (error) {
+				logger.error("Failed to cancel event", error, {
+					operation: "cancelEvent",
+					eventId: input.id,
+				});
 				return {
 					success: false,
 					message: "Failed to cancel event",
-					error: error as string,
-				}
+					error: error instanceof Error ? error.message : "Unknown error",
+				};
 			}
 		}),
 });
