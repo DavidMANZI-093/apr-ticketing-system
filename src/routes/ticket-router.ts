@@ -94,6 +94,7 @@ export const ticketRouter = t.router({
             }
         }),
 
+    // Get Tickets By Event
     getTickets: t.procedure
         .input(
             z.object({
@@ -129,5 +130,203 @@ export const ticketRouter = t.router({
                     error: error as string,
                 };
             }
-        })
+        }),
+
+    // Get Ticket
+    getTicket: t.procedure
+        .input(
+            z.object({
+                id: z.string(),
+            })
+        )
+        .query(async ({ input }) => {
+            try {
+                return await prisma.$transaction(async (tx) => {
+                    const ticket = await tx.ticket.findUnique({
+                        where: {
+                            id: input.id,
+                        },
+                    });
+                    if (ticket) {
+                        return {
+                            success: true,
+                            message: "Ticket retrieved successfully",
+                            ticket,
+                        };
+                    }
+                })
+            } catch (error) {
+                return {
+                    success: false,
+                    message: "Failed to retrieve ticket",
+                    error: error as string,
+                };
+            }
+        }),
+
+    // Get Tickets By Event
+    getTicketsByEvent: t.procedure
+        .input(
+            z.object({
+                eventId: z.string(),
+            })
+        )
+        .query(async ({ input }) => {
+            try {
+                return await prisma.$transaction(async (tx) => {
+                    const tickets = await tx.ticket.findMany({
+                        where: {
+                            eventId: input.eventId,
+                        },
+                    });
+                    if (tickets) {
+                        return {
+                            success: true,
+                            message: "Tickets retrieved successfully",
+                            tickets,
+                        };
+                    }
+                })
+            } catch (error) {
+                return {
+                    success: false,
+                    message: "Failed to retrieve tickets",
+                    error: error as string,
+                };
+            }
+        }),
+
+    // Get Tickets By Team
+    getTicketsByTeam: t.procedure
+        .input(
+            z.object({
+                teamId: z.string(),
+            })
+        )
+        .query(async ({ input }) => {
+            try {
+                return await prisma.$transaction(async (tx) => {
+                    const tickets = await tx.ticket.findMany({
+                        where: {
+                            teamId: input.teamId,
+                        },
+                    });
+                    if (tickets) {
+                        return {
+                            success: true,
+                            message: "Tickets retrieved successfully",
+                            tickets,
+                        };
+                    }
+                })
+            } catch (error) {
+                return {
+                    success: false,
+                    message: "Failed to retrieve tickets",
+                    error: error as string,
+                };
+            }
+        }),
+
+    // Get Tickets By State
+    getTicketByState: t.procedure
+        .input(
+            z.object({
+                state: z.enum(["PENDING", "PAID", "CANCELLED", "USED"]),
+            })
+        )
+        .query(async ({ input }) => {
+            try {
+                return await prisma.$transaction(async (tx) => {
+                    const tickets = await tx.ticket.findMany({
+                        where: {
+                            state: input.state,
+                        },
+                    });
+                    if (tickets) {
+                        return {
+                            success: true,
+                            message: "Tickets retrieved successfully",
+                            tickets,
+                        };
+                    }
+                })
+            } catch (error) {
+                return {
+                    success: false,
+                    message: "Failed to retrieve tickets",
+                    error: error as string,
+                };
+            }
+        }),
+
+    // Cancel Ticket
+    cancelTicket: t.procedure
+        .input(
+            z.object({
+                id: z.string(),
+            })
+        )
+        .mutation(async ({ input }) => {
+            try {
+                return await prisma.$transaction(async (tx) => {
+                    const ticket = await tx.ticket.update({
+                        where: {
+                            id: input.id,
+                        },
+                        data: {
+                            state: TicketState.CANCELLED,
+                        },
+                    });
+                    if (ticket) {
+                        return {
+                            success: true,
+                            message: "Ticket cancelled successfully",
+                            ticket,
+                        };
+                    }
+                })
+            } catch (error) {
+                return {
+                    success: false,
+                    message: "Failed to cancel ticket",
+                    error: error as string,
+                };
+            }
+        }),
+
+    // Update Ticket State (PENDING -> PAID)
+    updateTicketStatePaid: t.procedure
+        .input(
+            z.object({
+                id: z.string(),
+            })
+        )
+        .mutation(async ({ input }) => {
+            try {
+                return await prisma.$transaction(async (tx) => {
+                    const ticket = await tx.ticket.update({
+                        where: {
+                            id: input.id,
+                        },
+                        data: {
+                            state: TicketState.PAID,
+                        },
+                    });
+                    if (ticket) {
+                        return {
+                            success: true,
+                            message: "Ticket state updated successfully",
+                            ticket,
+                        };
+                    }
+                })
+            } catch (error) {
+                return {
+                    success: false,
+                    message: "Failed to update ticket state",
+                    error: error as string,
+                };
+            }
+        }),
 })

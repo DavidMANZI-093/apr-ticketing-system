@@ -5,6 +5,7 @@ import { TicketState } from "../../generated/prisma";
 import { v5 as uuidv5 } from "uuid";
 import dotenv from "dotenv";
 import { SeatingPlan } from "../types";
+import { id } from "zod/v4/locales/index.cjs";
 dotenv.config();
 
 export const eventRouter = t.router({
@@ -368,5 +369,41 @@ export const eventRouter = t.router({
 					error: error as string,
 				};
 			}
-		})
+		}),
+
+	// Cancel Event
+	cancelEvent: t.procedure
+		.input(
+			z.object({
+				id: z.string(),
+			})
+		)
+		.mutation(async ({ input }) => {
+			try {
+				return await prisma.$transaction(async (tx) => {
+					const event = await tx.event.update({
+						where: {
+							id: input.id,
+						},
+						data: {
+							active: false,
+						}
+					})
+
+					if (event) {
+						return {
+							success: true,
+							message: "Event cancelled successfully",
+							event,
+						}
+					}
+				})
+			} catch (error) {
+				return {
+					success: false,
+					message: "Failed to cancel event",
+					error: error as string,
+				}
+			}
+		}),
 });
