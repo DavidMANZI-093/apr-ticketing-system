@@ -21,9 +21,9 @@ enum UserRole {
 
 // User model - represents users with administrative roles only
 model User {
-  id        String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  id        String   @id @default(uuid()) @db.Uuid
   name      String   @db.VarChar(255)
-  email     String   @db.VarChar(255)
+  email     String   @db.VarChar(255) @unique
   password  String   @db.VarChar(255)
   role      UserRole @default(ADMIN)
   createdAt DateTime @default(now())
@@ -31,21 +31,25 @@ model User {
 }
 
 model Event {
-  id          String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  id          String   @id @default(uuid()) @db.Uuid
   name        String   @db.VarChar(255)
   description String   @db.VarChar(1020)
   location    String   @db.VarChar(255)
   seatingPlan Json?    @db.JsonB
   createdAt   DateTime @default(now())
+  startsAt    DateTime
+  active      Boolean  @default(false)
   updatedAt   DateTime @default(now()) @updatedAt
+
+  @@map("events")
 
   teams       Team[]
   tickets     Ticket[]
 }
 
 model Team {
-  id          String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
-  name        String   @db.VarChar(255)
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @db.VarChar(255) @unique
   description String   @db.VarChar(1020)
   logoUrl     String   @db.VarChar(255)
   createdAt   DateTime @default(now())
@@ -56,7 +60,7 @@ model Team {
 }
 
 model Ticket {
-  id        String   @id @default(dbgenerated("uuidv7()")) @db.Uuid
+  id        String   @id @default(uuid()) @db.Uuid
   client    Json     @db.JsonB
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
