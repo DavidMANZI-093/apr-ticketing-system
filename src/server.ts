@@ -27,24 +27,26 @@ app.listen(3000, () => {
 	console.log("Server running on http://localhost:3000");
 });
 
-cron.schedule('* * * * *', async () => {
+cron.schedule("* * * * *", async () => {
 	try {
-        const result = await prisma.event.updateMany({
-            where: {
-                active: true,
-                startsAt: {
-                    lte: new Date(Date.now() - 5 * 60 * 1000), // lte: less than 5 minutes before new date
-                },
-            },
-            data: {
-                active: false,
-            },
-        });
+		await prisma.$transaction(async (tx) => {
+			const result = await tx.event.updateMany({
+				where: {
+					active: true,
+					startsAt: {
+						lte: new Date(Date.now() - 5 * 60 * 1000), // lte: less than 5 minutes before new date
+					},
+				},
+				data: {
+					active: false,
+				},
+			});
 
-        if (result.count > 0) {
-            console.log(`Updated ${result.count} events`);
-        }
-    } catch (error) {
-        console.error("Failed to update events:", error);
-    }
+			if (result.count > 0) {
+				console.log(`Updated ${result.count} events`);
+			}
+		});
+	} catch (error) {
+		console.error("Failed to update events:", error);
+	}
 });
