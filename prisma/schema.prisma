@@ -52,6 +52,9 @@ model Event {
   teams   Team[]
   tickets Ticket[]
 
+  @@index([active])
+  @@index([startsAt])
+  @@index([active, startsAt])
   @@map("events")
 }
 
@@ -84,6 +87,10 @@ model Ticket {
   team   Team   @relation(fields: [teamId], references: [id])
 
   @@unique([seatId, eventId])
+  @@index([eventId])
+  @@index([state])
+  @@index([expiresAt])
+  @@index([eventId, state])
 }
 
 model ApiKey {
