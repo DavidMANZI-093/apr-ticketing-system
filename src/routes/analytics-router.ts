@@ -4,10 +4,11 @@ import { prisma } from "../controllers/prisma";
 import { TicketState } from "../../generated/prisma";
 import { SeatingPlan } from "../types";
 import { logger } from "../utils/logger";
+import { devProcedure } from "../middleware/dev-procedure";
 
 export const analyticsRouter = t.router({
 	// Get Event Revenue
-	getEventRevenue: t.procedure
+	getEventRevenue: devProcedure
 		.input(
 			z.object({
 				eventId: z.string(),

@@ -4,10 +4,14 @@ import { prisma } from "../controllers/prisma";
 import parsePhoneNumber from "libphonenumber-js";
 import { TicketState } from "../../generated/prisma";
 import { logger } from "../utils/logger";
+import { devProcedure } from "../middleware/dev-procedure";
+import { generateSecureQRData } from "../utils/qr-code";
+import QRCode from "qrcode";
+import crypto from "crypto";
 
 export const ticketRouter = t.router({
 	// Create Ticket
-	createTicket: t.procedure
+	createTicket: devProcedure
 		.input(
 			z.object({
 				eventId: z.string(),
@@ -79,6 +83,17 @@ export const ticketRouter = t.router({
 									where: { id: input.eventId },
 									data: { seatingPlan },
 								});
+
+								// Broadcast seat update via SSE
+								const { sseManager } = await import("../utils/sse-manager");
+								const seat = seatingPlan[input.seatId];
+								sseManager.broadcastSeatUpdate(
+									input.eventId,
+									input.seatId,
+									false, // seat is now unavailable
+									seat?.price,
+									seat?.label,
+								);
 							}
 						}
 
@@ -106,7 +121,7 @@ export const ticketRouter = t.router({
 		}),
 
 	// Get All Tickets
-	getTickets: t.procedure.query(async () => {
+	getTickets: devProcedure.query(async () => {
 		try {
 			return await prisma.$transaction(async (tx) => {
 				const tickets = await tx.ticket.findMany();
@@ -137,7 +152,7 @@ export const ticketRouter = t.router({
 	}),
 
 	// Get Ticket
-	getTicket: t.procedure
+	getTicket: devProcedure
 		.input(
 			z.object({
 				id: z.string(),
@@ -173,7 +188,7 @@ export const ticketRouter = t.router({
 		}),
 
 	// Get Tickets By Event
-	getTicketsByEvent: t.procedure
+	getTicketsByEvent: devProcedure
 		.input(
 			z.object({
 				eventId: z.string(),
@@ -209,7 +224,7 @@ export const ticketRouter = t.router({
 		}),
 
 	// Get Tickets By Team
-	getTicketsByTeam: t.procedure
+	getTicketsByTeam: devProcedure
 		.input(
 			z.object({
 				teamId: z.string(),
@@ -245,7 +260,7 @@ export const ticketRouter = t.router({
 		}),
 
 	// Get Tickets By State
-	getTicketByState: t.procedure
+	getTicketByState: devProcedure
 		.input(
 			z.object({
 				state: z.enum(["PENDING", "PAID", "CANCELLED", "USED"]),
@@ -281,7 +296,7 @@ export const ticketRouter = t.router({
 		}),
 
 	// Cancel Ticket
-	cancelTicket: t.procedure
+	cancelTicket: devProcedure
 		.input(
 			z.object({
 				id: z.string(),
@@ -298,7 +313,41 @@ export const ticketRouter = t.router({
 							state: TicketState.CANCELLED,
 						},
 					});
+
 					if (ticket) {
+						// Release the seat and broadcast update
+						const event = await tx.event.findUnique({
+							where: { id: ticket.eventId },
+							select: { seatingPlan: true },
+						});
+
+						if (event?.seatingPlan) {
+							const seatingPlan = event.seatingPlan as Record<
+								string,
+								{ label: string; price: number; isAvailable: boolean }
+							>;
+
+							if (seatingPlan[ticket.seatId]) {
+								seatingPlan[ticket.seatId].isAvailable = true;
+
+								await tx.event.update({
+									where: { id: ticket.eventId },
+									data: { seatingPlan },
+								});
+
+								// Broadcast seat update via SSE
+								const { sseManager } = await import("../utils/sse-manager");
+								const seat = seatingPlan[ticket.seatId];
+								sseManager.broadcastSeatUpdate(
+									ticket.eventId,
+									ticket.seatId,
+									true, // seat is now available
+									seat?.price,
+									seat?.label,
+								);
+							}
+						}
+
 						return {
 							success: true,
 							message: "Ticket cancelled successfully",
@@ -320,7 +369,7 @@ export const ticketRouter = t.router({
 		}),
 
 	// Update Ticket State (PENDING -> PAID)
-	updateTicketStatePaid: t.procedure
+	updateTicketStatePaid: devProcedure
 		.input(
 			z.object({
 				id: z.string(),
@@ -353,6 +402,131 @@ export const ticketRouter = t.router({
 				return {
 					success: false,
 					message: "Failed to update ticket state",
+					error: error instanceof Error ? error.message : "Unknown error",
+				};
+			}
+		}),
+
+	// Get Ticket QR Code
+	getTicketQRCode: devProcedure
+		.input(
+			z.object({
+				ticketId: z.string(),
+			}),
+		)
+		.query(async ({ input }) => {
+			try {
+				return await prisma.$transaction(async (tx) => {
+					const ticket = await tx.ticket.findUnique({
+						where: {
+							id: input.ticketId,
+						},
+					});
+
+					if (ticket) {
+						const qrData = generateSecureQRData(ticket);
+						const qrBuffer = await QRCode.toBuffer(qrData, {
+							width: 256,
+							margin: 2,
+							errorCorrectionLevel: "M",
+						});
+						return {
+							success: true,
+							message: "Ticket QR code retrieved successfully",
+							qrCode: `data:image/png;base64,${qrBuffer.toString("base64")}`,
+							ticketInfo: {
+								event: await tx.event
+									.findUnique({ where: { id: ticket.eventId } })
+									.then((event) => event?.name),
+								seat: ticket.seatId,
+								date: await tx.event
+									.findUnique({ where: { id: ticket.eventId } })
+									.then((event) => event?.startsAt),
+								client: ticket.client,
+							},
+						};
+					}
+				});
+			} catch (error) {
+				logger.error("Failed to retrieve ticket QR code", error, {
+					operation: "getTicketQRCode",
+					ticketId: input.ticketId,
+				});
+				return {
+					success: false,
+					message: "Failed to retrieve ticket QR code",
+					error: error instanceof Error ? error.message : "Unknown error",
+				};
+			}
+		}),
+
+	// Validate Ticket QR Code
+	validateQRCode: devProcedure
+		.input(
+			z.object({
+				qrData: z.string(),
+			}),
+		)
+		.mutation(async ({ input }) => {
+			try {
+				return await prisma.$transaction(async (tx) => {
+					const [encodedPayload, signature] = input.qrData.split(".");
+					const payload = JSON.parse(
+						Buffer.from(encodedPayload, "base64").toString("utf-8"),
+					);
+
+					if (!process.env.QR_SECRET) {
+						throw new Error("QR_SECRET is not defined");
+					}
+
+					// Verify signature
+					const expectedSig = crypto
+						.createHmac("sha256", process.env.QR_SECRET)
+						.update(JSON.stringify(payload))
+						.digest("hex")
+						.substring(0, 16);
+
+					if (signature !== expectedSig) {
+						throw new Error("Invalid signature");
+					}
+
+					const ticket = await tx.ticket.update({
+						where: {
+							id: payload.t,
+							state: TicketState.PAID,
+						},
+						data: {
+							state: TicketState.USED,
+						},
+						include: {
+							event: true,
+						},
+					});
+
+					// Type-safe seatingPlan access
+					const seatingPlan = ticket.event.seatingPlan as Record<string, { label: string; price: number; isAvailable: boolean }> | null;
+					const seatLabel = seatingPlan?.[ticket.seatId]?.label || ticket.seatId;
+
+					return {
+						success: true,
+						message: "Ticket QR code validated successfully",
+						ticket: {
+							id: ticket.id,
+							event: ticket.event.name,
+							seat: seatLabel,
+							client: ticket.client,
+							startsAt: ticket.event.startsAt,
+						},
+					};
+				});
+			} catch (error) {
+				logger.error("Failed to validate ticket QR code", error, {
+					operation: "validateQRCode",
+					qrData: input.qrData,
+				});
+				return {
+					success: false,
+					message: "Failed to validate ticket QR code",
 					error: error instanceof Error ? error.message : "Unknown error",
 				};
 			}

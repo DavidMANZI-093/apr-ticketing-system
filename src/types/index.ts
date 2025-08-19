@@ -3,3 +3,9 @@ export interface SeatingPlan {
 	price: number;
 	isAvailable: boolean;
 }
+
+export interface RateLimitRecord {
+	count: number;
+	resetTime: number;
+	firstRequest: number;
+}

@@ -2,10 +2,11 @@ import { t } from "../controllers/trpc";
 import { prisma } from "../controllers/prisma";
 import { z } from "zod";
 import { logger } from "../utils/logger";
+import { devProcedure } from "../middleware/dev-procedure";
 
 export const teamRouter = t.router({
 	// get Teams
-	getTeams: t.procedure.query(async () => {
+	getTeams: devProcedure.query(async () => {
 		try {
 			return await prisma.$transaction(async (tx) => {
 				const teams = await tx.team.findMany();
@@ -36,7 +37,7 @@ export const teamRouter = t.router({
 	}),
 
 	// get Team
-	getTeam: t.procedure
+	getTeam: devProcedure
 		.input(
 			z.object({
 				id: z.string(),
@@ -72,7 +73,7 @@ export const teamRouter = t.router({
 		}),
 
 	// Update Team
-	updateTeam: t.procedure
+	updateTeam: devProcedure
 		.input(
 			z.object({
 				id: z.string(),

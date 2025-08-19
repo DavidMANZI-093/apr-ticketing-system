@@ -24,15 +24,20 @@ class Logger {
 				statusCode: (error as any).statusCode,
 			};
 		}
-		
-		if (typeof error === 'string') {
+
+		if (typeof error === "string") {
 			return { message: error };
 		}
-		
-		return { message: 'Unknown error occurred' };
+
+		return { message: "Unknown error occurred" };
 	}
 
-	private formatLog(level: string, message: string, context?: LogContext, error?: unknown) {
+	private formatLog(
+		level: string,
+		message: string,
+		context?: LogContext,
+		error?: unknown,
+	) {
 		const timestamp = new Date().toISOString();
 		const logEntry: Record<string, any> = {
 			timestamp,
@@ -52,20 +57,20 @@ class Logger {
 	}
 
 	info(message: string, context?: LogContext) {
-		console.log(this.formatLog('INFO', message, context));
+		console.log(this.formatLog("INFO", message, context));
 	}
 
 	warn(message: string, context?: LogContext) {
-		console.warn(this.formatLog('WARN', message, context));
+		console.warn(this.formatLog("WARN", message, context));
 	}
 
 	error(message: string, error?: unknown, context?: LogContext) {
-		console.error(this.formatLog('ERROR', message, context, error));
+		console.error(this.formatLog("ERROR", message, context, error));
 	}
 
 	debug(message: string, context?: LogContext) {
-		if (process.env.NODE_ENV === 'development') {
-			console.debug(this.formatLog('DEBUG', message, context));
+		if (process.env.NODE_ENV === "development") {
+			console.debug(this.formatLog("DEBUG", message, context));
 		}
 	}
 }

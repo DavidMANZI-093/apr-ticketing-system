@@ -6,11 +6,12 @@ import { v5 as uuidv5 } from "uuid";
 import dotenv from "dotenv";
 import { SeatingPlan } from "../types";
 import { logger } from "../utils/logger";
+import { devProcedure } from "../middleware/dev-procedure";
 dotenv.config();
 
 export const eventRouter = t.router({
 	// Create Event
-	createEvent: t.procedure
+	createEvent: devProcedure
 		.input(
 			z.object({
 				name: z.string(),
@@ -117,7 +118,7 @@ export const eventRouter = t.router({
 		}),
 
 	// Get All Events
-	getAllEvents: t.procedure.query(async () => {
+	getAllEvents: devProcedure.query(async () => {
 		try {
 			return await prisma.$transaction(async (tx) => {
 				const events = await tx.event.findMany();
@@ -148,7 +149,7 @@ export const eventRouter = t.router({
 	}),
 
 	// Get Events - Active only
-	getEvents: t.procedure.query(async () => {
+	getEvents: devProcedure.query(async () => {
 		try {
 			return await prisma.$transaction(async (tx) => {
 				const events = await tx.event.findMany({
@@ -183,7 +184,7 @@ export const eventRouter = t.router({
 	}),
 
 	// Get Event
-	getEvent: t.procedure
+	getEvent: devProcedure
 		.input(
 			z.object({
 				id: z.string(),
@@ -226,7 +227,7 @@ export const eventRouter = t.router({
 		}),
 
 	// Update Event
-	updateEvent: t.procedure
+	updateEvent: devProcedure
 		.input(
 			z.object({
 				id: z.string(),
@@ -313,7 +314,7 @@ export const eventRouter = t.router({
 				logger.error("Failed to update event", error, {
 					operation: "updateEvent",
 					eventId: input.id,
-					updateFields: Object.keys(input).filter(key => key !== 'id'),
+					updateFields: Object.keys(input).filter((key) => key !== "id"),
 				});
 				return {
 					success: false,
@@ -324,7 +325,7 @@ export const eventRouter = t.router({
 		}),
 
 	// Get Event Status
-	getEventStatus: t.procedure
+	getEventStatus: devProcedure
 		.input(
 			z.object({
 				id: z.string(),
@@ -412,7 +413,7 @@ export const eventRouter = t.router({
 		}),
 
 	// Cancel Event
-	cancelEvent: t.procedure
+	cancelEvent: devProcedure
 		.input(
 			z.object({
 				id: z.string(),

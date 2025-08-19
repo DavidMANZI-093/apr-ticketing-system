@@ -17,6 +17,7 @@
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
     "@types/express": "^5.0.3",
     "@types/node": "^24.3.0",
     "nodemon": "^3.1.10",
@@ -28,10 +29,15 @@
   "dependencies": {
     "@prisma/client": "^6.14.0",
     "@trpc/server": "^11.4.4",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/qrcode": "^1.5.5",
     "@types/uuid": "^10.0.0",
+    "bcrypt": "^6.0.0",
     "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
     "libphonenumber-js": "^1.12.12",
     "node-cron": "^4.2.1",
+    "qrcode": "^1.5.4",
     "uuid": "^11.1.0",
     "zod": "^4.0.17"
   }
