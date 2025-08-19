@@ -574,4 +574,4 @@ Common HTTP status codes:
 
 ## License
 
-ISC License - See package.json for details.
+MIT License - See package.json for details.

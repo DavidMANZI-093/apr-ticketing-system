@@ -1,7 +1,7 @@
 {
   "name": "apr-ticketing-system",
   "version": "1.0.0",
-  "description": "",
+  "description": "A ticketing system for APR events",
   "main": "src/server.ts",
   "scripts": {
     "build": "tsc",
@@ -14,7 +14,7 @@
   },
   "keywords": [],
   "author": "d3fault",
-  "license": "ISC",
+  "license": "MIT",
   "type": "commonjs",
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
