@@ -66,13 +66,13 @@ export const eventRouter = t.router({
 								(seatMap, section) => {
 									section.rows.forEach((row) => {
 										row.seats.forEach((seat) => {
-											if (!process.env.SEAT_NAMESPACE) {
+											if (!process.env.UUID_NAMESPACE) {
 												// Namespace UUID for seat ID generation
-												throw new Error("SEAT_NAMESPACE is not defined");
+												throw new Error("UUID_NAMESPACE is not defined");
 											}
 											const seatId = uuidv5(
 												`${section.name}${row.number}-${seat.number}`,
-												process.env.SEAT_NAMESPACE as string,
+												process.env.UUID_NAMESPACE as string,
 											);
 											seatMap[seatId] = {
 												label: `${section.name}${row.number}-${seat.number}`,

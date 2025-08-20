@@ -37,7 +37,7 @@ class SSEManager {
 
 		// Handle connection cleanup
 		res.on("close", () => {
-			this.removeConnection(eventId, connection);
+			this.removeConnectionInternal(eventId, connection);
 		});
 
 		res.on("error", (error) => {
@@ -46,12 +46,12 @@ class SSEManager {
 				eventId,
 				userId,
 			});
-			this.removeConnection(eventId, connection);
+			this.removeConnectionInternal(eventId, connection);
 		});
 	}
 
-	// Remove connection
-	private removeConnection(eventId: string, connection: SSEConnection): void {
+	// Remove connection (internal)
+	private removeConnectionInternal(eventId: string, connection: SSEConnection): void {
 		const eventConnections = this.connections.get(eventId);
 		if (eventConnections) {
 			eventConnections.delete(connection);
@@ -103,7 +103,7 @@ class SSEManager {
 
 		// Clean up dead connections
 		deadConnections.forEach((connection) => {
-			this.removeConnection(eventId, connection);
+			this.removeConnectionInternal(eventId, connection);
 		});
 
 		logger.info("Broadcasted seating update", {
@@ -157,7 +157,7 @@ class SSEManager {
 
 		// Clean up dead connections
 		deadConnections.forEach((connection) => {
-			this.removeConnection(eventId, connection);
+			this.removeConnectionInternal(eventId, connection);
 		});
 
 		logger.info("Broadcasted seat update", {
@@ -183,6 +183,28 @@ class SSEManager {
 		};
 	}
 
+	// Clear all connections (for testing)
+	clearAllConnections(): void {
+		this.connections.clear();
+		this.connectionCount = 0;
+	}
+
+	// Remove connection by response object
+	removeConnection(eventId: string, res: Response): void {
+		const eventConnections = this.connections.get(eventId);
+		if (eventConnections) {
+			const connectionToRemove = Array.from(eventConnections).find(conn => conn.res === res);
+			if (connectionToRemove) {
+				eventConnections.delete(connectionToRemove);
+				this.connectionCount--;
+
+				if (eventConnections.size === 0) {
+					this.connections.delete(eventId);
+				}
+			}
+		}
+	}
+
 	// Cleanup stale connections (run periodically)
 	cleanup(): void {
 		let cleaned = 0;
@@ -204,7 +226,7 @@ class SSEManager {
 				} catch (error) {
 					// Connection already closed
 				}
-				this.removeConnection(eventId, connection);
+				this.removeConnectionInternal(eventId, connection);
 				cleaned++;
 			});
 		});
