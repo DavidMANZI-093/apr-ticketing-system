@@ -54,10 +54,26 @@ export const adminRouter = t.router({
 						};
 					}
 
+					// Issue admin token for protected admin procedures
+					if (!process.env.ADMIN_JWT_SECRET) {
+						throw new Error("ADMIN_JWT_SECRET is not defined");
+					}
+
+					const adminToken = jwt.sign(
+						{
+							role: "admin",
+							userId: user.id,
+							username: user.name,
+						},
+						process.env.ADMIN_JWT_SECRET,
+						{ expiresIn: "1d" },
+					);
+
 					return {
 						success: true,
 						message: "User logged in successfully",
 						user,
+						token: adminToken,
 					};
 				});
 			} catch (error) {
