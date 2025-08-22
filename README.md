@@ -284,12 +284,25 @@ Headers: { Authorization: "Bearer <dev-token>" }
 
 ### Update Ticket State
 ```typescript
-// Mark as paid
+// Mark as paid (with payment processing)
 POST /ticket.updateTicketStatePaid
 Headers: { Authorization: "Bearer <dev-token>" }
 {
   "id": "ticket-uuid"
 }
+
+// Payment Processing Flow:
+// 1. Validates ticket exists and is in PENDING state
+// 2. Extracts client info and seat pricing from ticket
+// 3. Creates signed invoice with JWT using PAY_JWT_SECRET
+// 4. Sends payment request to external payment gateway
+// 5. Validates payment response and updates ticket to PAID state
+// 6. Returns success/error with detailed messaging
+
+// Required Environment Variables:
+// PAY_JWT_SECRET - Secret for signing payment invoices
+// PAY_API_URL - Payment gateway base URL
+// PAY_API_KEY - API key for payment gateway authentication
 
 // Cancel ticket
 POST /ticket.cancelTicket  
@@ -490,6 +503,9 @@ ADMIN_JWT_SECRET="your-admin-secret"
 JWT_SECRET="your-api-secret"
 HASH_SECRET="your-hash-secret"
 QR_SECRET="your-qr-secret"
+PAY_JWT_SECRET="your-pay-jwt-secret"
+PAY_API_URL="https://payment-gateway.com/api"
+PAY_API_KEY="your-pay-api-key"
 ```
 
 ### Development Setup

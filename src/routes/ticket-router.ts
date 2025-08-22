@@ -8,6 +8,7 @@ import { devProcedure } from "../middleware/dev-procedure";
 import { generateSecureQRData } from "../utils/qr-code";
 import QRCode from "qrcode";
 import crypto from "crypto";
+import jwt from "jsonwebtoken";
 
 export const ticketRouter = t.router({
 	// Create Ticket
@@ -378,6 +379,78 @@ export const ticketRouter = t.router({
 		.mutation(async ({ input }) => {
 			try {
 				return await prisma.$transaction(async (tx) => {
+					const eTicket = await tx.ticket.findUnique({
+						where: {
+							id: input.id,
+						},
+						include: {
+							event: true,
+						}
+					});
+
+					if (!eTicket) {
+						throw new Error("Ticket not found");
+					}
+
+					if (eTicket.state !== TicketState.PENDING) {
+						throw new Error("Ticket is not in PENDING state");
+					}
+
+					const client = eTicket.client as {
+						name: string,
+						phone: string,
+						email: string,
+					};
+
+					const payload = {
+						invoiceId: `ticket-${eTicket.id}`,
+						amount: (eTicket.event.seatingPlan as Record<string, { label: string; price: number; isAvailable: boolean }>) [eTicket.seatId].price,
+						currency: "RWF",
+						user: {
+							name: client.name,
+							phone: client.phone,
+							email: client.email,
+						}
+					}
+
+					if (!process.env.PAY_JWT_SECRET) {
+						throw new Error("PAY_JWT_SECRET is not defined");
+					}
+
+					const signedInvoice = jwt.sign(payload, process.env.PAY_JWT_SECRET);
+
+					const payment = await fetch(`${process.env.PAY_API_URL}/pay.pay`, {
+						method: "POST",
+						headers: {
+							"Content-Type": "application/json",
+							"Authorization": `Bearer ${process.env.PAY_API_KEY}`,
+						},
+						body: JSON.stringify({
+							signedInvoice,
+						}),
+					});
+
+					if (!payment.ok) {
+						throw new Error(`Payment gateway error: ${payment.statusText}`);
+					}
+
+					const paymentData = await payment.json() as {
+						result?: {
+							data?: {
+								success: boolean;
+								message: string;
+								data: {
+									id: string;
+									paid: boolean;
+								};
+							}
+						}
+					};
+
+					if (!paymentData.result?.data?.success) {
+						throw new Error(`Payment failed: ${paymentData.result?.data?.message || "Unknown error"}`);
+					}
+
 					const ticket = await tx.ticket.update({
 						where: {
 							id: input.id,
@@ -386,6 +459,7 @@ export const ticketRouter = t.router({
 							state: TicketState.PAID,
 						},
 					});
+
 					if (ticket) {
 						return {
 							success: true,
