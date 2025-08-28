@@ -203,16 +203,16 @@ const scheduleNextCronJob = async () => {
 						const eventSeats = await tx.eventSeats.updateMany({
 							where: {
 								seatId: {
-									in: expiredTickets.map((t) => t.seatId)
+									in: expiredTickets.map((t) => t.seatId),
 								},
 								eventId: {
-									in: expiredTickets.map((t) => t.eventId)
-								}
+									in: expiredTickets.map((t) => t.eventId),
+								},
 							},
 							data: {
 								isAvailable: true,
-							}
-						})
+							},
+						});
 
 						logger.info(
 							`Cancelled ${expiredTickets.length} expired tickets and released seats across ${eventSeats.count} events`,

@@ -29,7 +29,7 @@ export const analyticsRouter = t.router({
 									},
 								},
 								select: {
-									seat: true
+									seat: true,
 								},
 							},
 						},

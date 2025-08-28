@@ -117,7 +117,9 @@ export const alphaRouter = t.router({
 						keyId: keyRecord.id,
 						name: input.name,
 					},
-					(input.name === "admin" ? process.env.ADMIN_JWT_SECRET : process.env.JWT_SECRET),
+					input.name === "admin"
+						? process.env.ADMIN_JWT_SECRET
+						: process.env.JWT_SECRET,
 					{
 						expiresIn: "15d", // 15 days
 					},
