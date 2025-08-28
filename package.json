@@ -12,6 +12,7 @@
     "db:reset": "prisma migrate reset --force",
     "db:studio": "prisma studio",
     "db:seed": "npx tsx prisma/scripts/db-seed.ts",
+    "test:mailer": "npx tsx src/controllers/mailer.ts",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage"
@@ -39,6 +40,7 @@
     "@prisma/client": "^6.14.0",
     "@trpc/server": "^11.4.4",
     "@types/jsonwebtoken": "^9.0.10",
+    "@types/nodemailer": "^7.0.1",
     "@types/qrcode": "^1.5.5",
     "@types/uuid": "^10.0.0",
     "bcrypt": "^6.0.0",
@@ -46,6 +48,7 @@
     "jsonwebtoken": "^9.0.2",
     "libphonenumber-js": "^1.12.12",
     "node-cron": "^4.2.1",
+    "nodemailer": "^7.0.5",
     "qrcode": "^1.5.4",
     "uuid": "^11.1.0",
     "zod": "^4.0.17"
