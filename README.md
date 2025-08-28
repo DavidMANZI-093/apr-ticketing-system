@@ -1,93 +1,107 @@
 # APR Ticketing System
 
-A production-ready, enterprise-grade ticketing system built with TypeScript, tRPC, and Prisma. Features secure authentication, QR code generation, dynamic resource management, and comprehensive event management.
+A comprehensive event ticketing system built with TypeScript, tRPC, and Prisma. Features secure authentication, QR code generation, real-time seat updates, and comprehensive event management with payment processing integration.
 
 ## System Architecture
 
 ### Core Technologies
 - **Backend**: Node.js + Express + tRPC
 - **Database**: PostgreSQL with Prisma ORM
-- **Authentication**: JWT with role-based access control
+- **Authentication**: JWT with role-based access control (Admin, Dev, Alpha)
 - **Real-time**: Server-Sent Events (SSE) for live seat updates
-- **Security**: Rate limiting, HMAC-signed QR codes
+- **Security**: Rate limiting, HMAC-signed QR codes, bcrypt password hashing
 - **Scheduling**: Dynamic cron jobs with adaptive intervals
+- **Payment**: External payment gateway integration with JWT-signed invoices
 
 ### Project Structure
 ```
 src/
 ├── controllers/          # Database and tRPC setup
+│   ├── app.ts           # Application configuration
 │   ├── prisma.ts        # Prisma client configuration
 │   └── trpc.ts          # tRPC context and router setup
 ├── middleware/          # Authentication and authorization
-│   ├── admin-procedure.ts   # Admin-level JWT middleware
-│   ├── dev-procedure.ts     # Developer-level JWT middleware with rate limiting
+│   ├── admin-procedure.ts   # Admin-level JWT middleware (100 req/hour)
+│   ├── alpha-procedure.ts   # Alpha-level JWT middleware (super admin)
+│   ├── dev-procedure.ts     # Developer-level JWT middleware (100 req/hour)
 │   └── sse-auth.ts         # SSE authentication middleware
 ├── routes/              # API endpoint definitions
-│   ├── admin-router.ts      # User management and API key operations
+│   ├── alpha-router.ts      # Admin login and API key management
 │   ├── analytics-router.ts  # Revenue and statistics endpoints
 │   ├── event-router.ts      # Event CRUD and management
+│   ├── seat-router.ts       # Venue and seat management
 │   ├── team-router.ts       # Team management
-│   └── ticket-router.ts     # Ticket lifecycle and QR code operations
+│   ├── ticket-router.ts     # Ticket lifecycle and QR code operations
+│   ├── user-router.ts       # User management
+│   └── venue-router.ts      # Venue CRUD operations
 ├── utils/               # Utility functions
 │   ├── logger.ts           # Structured logging with context
 │   ├── qr-code.ts          # Secure QR code generation
 │   ├── rate-limiter.ts     # In-memory rate limiting
 │   └── sse-manager.ts      # Server-Sent Events management
 ├── types/               # TypeScript type definitions
-└── server.ts           # Main application entry point
+└── server.ts           # Main application entry point with cron jobs
 ```
 
 ## Authentication System
 
 ### User Roles
-- **ADMIN**: Full system access, user management, API key creation
+- **ALPHA**: Super admin access, can create API keys and manage system
+- **ADMIN**: Full system access, event and ticket management
 - **DEV**: API access with rate limiting (100 requests/hour)
 
 ### Authentication Flow
-1. Admin login with username + password + phrase (2FA)
-2. API key creation for different environments (dev/prod/readonly)
+1. Alpha login with username + password + phrase (triple authentication)
+2. API key creation for different roles (dev/admin)
 3. JWT token usage with Bearer authentication
 4. Automatic rate limiting and token validation
 
 ### Security Features
-- Bcrypt password hashing
+- Bcrypt password hashing with salt
 - HMAC-SHA256 signed QR codes
-- JWT token expiration (15 days)
-- Rate limiting with automatic cleanup
+- JWT token expiration (1 day for alpha, 15 days for API keys)
+- Rate limiting with automatic cleanup (100 requests/hour)
 - Role-based endpoint protection
 
 ## Core Features
 
 ### Event Management
-- Create events with flexible seating plans
-- Team-based ticket organization (2 teams per event)
-- Automatic event deactivation after start time
-- Real-time seat availability tracking
+- Create events with venue association and team setup (exactly 2 teams per event)
+- Automatic event deactivation 5 minutes after start time
+- Real-time seat availability tracking via SSE
+- Event seat pricing and category management
 
-### Ticket Lifecycle
+### Ticket Types & Lifecycle
 ```
-PENDING (15min expiry) → PAID → USED
-                    ↓
-                CANCELLED
+Ticket Types: SINGLE (1 person) | GROUP (3-5 people) | FAMILY (3-7 people) | GIFT
+States: PENDING (15min expiry) → PAID → USED
+                              ↓
+                          CANCELLED/REFUNDED
 ```
 
 ### QR Code System
-- Cryptographically secure QR generation
-- Anti-tampering protection with HMAC signatures
-- One-time use validation
+- Cryptographically secure QR generation with HMAC-SHA256
+- Anti-tampering protection with payload signing
+- One-time use validation (PAID → USED)
 - Base64 PNG format for easy integration
 
 ### Real-time Updates
 - Server-Sent Events for live seat availability
 - Automatic connection management and cleanup
-- Efficient broadcasting to connected clients
+- Efficient broadcasting to connected clients per event
 - Instant seat reservation/release notifications
 
 ### Dynamic Resource Management
-- Adaptive cron job scheduling based on event proximity
-- Batch processing for expired ticket cleanup
-- Memory-efficient rate limiting
+- Adaptive cron job scheduling based on event proximity (1-5 minutes)
+- Batch processing for expired ticket cleanup and seat release
+- Memory-efficient rate limiting with automatic cleanup
 - Optimized database queries with transactions
+
+### Payment Processing
+- External payment gateway integration
+- JWT-signed invoice generation
+- Automatic ticket state updates upon payment confirmation
+- Comprehensive error handling and logging
 
 ---
 
@@ -105,37 +119,54 @@ All endpoints require Bearer token authentication:
 Authorization: Bearer <your-jwt-token>
 ```
 
-## Admin Endpoints
+## Alpha/Admin Endpoints
 
-### Login
+### Alpha Login
 ```typescript
-POST /admin.login
+POST /trpc/alpha.login
 {
   "username": "admin_user",
   "password": "secure_password", 
   "phrase": "security_phrase"
 }
+
+// Response:
+{
+  "success": true,
+  "message": "User logged in successfully",
+  "user": { /* admin user object */ },
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
 ```
 
 ### Create API Key
 ```typescript
-POST /admin.createApiKey
-Headers: { Authorization: "Bearer <admin-token>" }
+POST /trpc/alpha.createApiKey
+Headers: { Authorization: "Bearer <alpha-token>" }
 {
-  "name": "dev" | "prod" | "readonly"
+  "name": "dev" | "admin"
+}
+
+// Response:
+{
+  "success": true,
+  "message": "API Key created successfully",
+  "apiToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 }
 ```
 
 ### List API Keys
 ```typescript
-GET /admin.listApiKeys
-Headers: { Authorization: "Bearer <admin-token>" }
+GET /trpc/alpha.listApiKeys
+Headers: { Authorization: "Bearer <alpha-token>" }
+
+// Returns array of API key records
 ```
 
 ### Revoke API Key
 ```typescript
-POST /admin.revokeApiKey
-Headers: { Authorization: "Bearer <admin-token>" }
+POST /trpc/alpha.revokeApiKey
+Headers: { Authorization: "Bearer <alpha-token>" }
 {
   "id": "api-key-uuid"
 }
@@ -145,32 +176,13 @@ Headers: { Authorization: "Bearer <admin-token>" }
 
 ### Create Event
 ```typescript
-POST /event.createEvent
-Headers: { Authorization: "Bearer <dev-token>" }
+POST /trpc/event.createEvent
+Headers: { Authorization: "Bearer <admin-token>" }
 {
   "name": "Concert 2024",
   "description": "Amazing live performance",
-  "location": "Main Arena",
+  "venueId": "venue-uuid",
   "startsAt": "2024-12-25T19:00:00Z",
-  "seatingPlan": {
-    "sections": [
-      {
-        "name": "A",
-        "rows": [
-          {
-            "number": 1,
-            "seats": [
-              {
-                "number": 1,
-                "price": 50.00,
-                "isAvailable": true
-              }
-            ]
-          }
-        ]
-      }
-    ]
-  },
   "teams": [
     {
       "name": "Team Alpha",
@@ -184,40 +196,41 @@ Headers: { Authorization: "Bearer <dev-token>" }
     }
   ]
 }
+
+// Note: Must provide exactly 2 teams
+// Event seats are created separately via seat router
 ```
 
 ### Get Active Events
 ```typescript
-GET /event.getEvents
+GET /trpc/event.getEvents
 Headers: { Authorization: "Bearer <dev-token>" }
+
+// Returns only active events
+```
+
+### Get All Events (Admin)
+```typescript
+GET /trpc/event.getAllEvents
+Headers: { Authorization: "Bearer <admin-token>" }
+
+// Returns all events (active and inactive)
 ```
 
 ### Get Event Details
 ```typescript
-GET /event.getEvent
-Headers: { Authorization: "Bearer <dev-token>" }
-{
-  "id": "event-uuid"
-}
-```
-
-### Get Event Status & Statistics
-```typescript
-GET /event.getEventStatus
+GET /trpc/event.getEvent
 Headers: { Authorization: "Bearer <dev-token>" }
 {
   "id": "event-uuid"
 }
 
-// Response includes:
-// - Total/available/reserved seats
-// - Ticket counts by state
-// - Revenue calculations
+// Returns single event if active
 ```
 
 ### Update Event
 ```typescript
-POST /event.updateEvent
+POST /trpc/event.updateEvent
 Headers: { Authorization: "Bearer <dev-token>" }
 {
   "id": "event-uuid",
@@ -227,7 +240,9 @@ Headers: { Authorization: "Bearer <dev-token>" }
   "teams": [
     {
       "id": "team-uuid",
-      "name": "Updated Team Name" // optional
+      "name": "Updated Team Name", // optional
+      "description": "Updated description", // optional
+      "logoUrl": "https://example.com/new-logo.png" // optional
     }
   ]
 }
@@ -235,88 +250,257 @@ Headers: { Authorization: "Bearer <dev-token>" }
 
 ### Cancel Event
 ```typescript
-POST /event.cancelEvent
-Headers: { Authorization: "Bearer <dev-token>" }
+POST /trpc/event.cancelEvent
+Headers: { Authorization: "Bearer <admin-token>" }
 {
   "id": "event-uuid"
 }
+
+// Sets event.active = false
 ```
 
-## Ticket Operations
+## Venue & Seat Management
 
-### Create Ticket
+### Create Venue
 ```typescript
-POST /ticket.createTicket
-Headers: { Authorization: "Bearer <dev-token>" }
+POST /trpc/venue.createVenue
+Headers: { Authorization: "Bearer <admin-token>" }
 {
-  "eventId": "event-uuid",
-  "teamId": "team-uuid", 
-  "seatId": "seat-uuid",
-  "client": {
-    "name": "John Doe",
-    "email": "john@example.com",
-    "phone": "+250 788 888 888"
+  "name": "Main Arena",
+  "description": "Large concert venue",
+  "location": {
+    "longitude": -1.9441,
+    "latitude": 30.0619
   }
 }
 ```
 
-### Get Tickets
+### Create Seats for Venue
 ```typescript
-// All tickets
-GET /ticket.getTickets
-Headers: { Authorization: "Bearer <dev-token>" }
+POST /trpc/seat.createSeats
+Headers: { Authorization: "Bearer <admin-token>" }
+{
+  "venueId": "venue-uuid",
+  "seats": [
+    {
+      "section": "A",
+      "row": 1,
+      "number": 1
+    },
+    {
+      "section": "A",
+      "row": 1,
+      "number": 2
+    }
+  ]
+}
 
-// By event
-GET /ticket.getTicketsByEvent
-Headers: { Authorization: "Bearer <dev-token>" }
-{ "eventId": "event-uuid" }
-
-// By team  
-GET /ticket.getTicketsByTeam
-Headers: { Authorization: "Bearer <dev-token>" }
-{ "teamId": "team-uuid" }
-
-// By state
-GET /ticket.getTicketByState
-Headers: { Authorization: "Bearer <dev-token>" }
-{ "state": "PENDING" | "PAID" | "USED" | "CANCELLED" }
+// Creates seats with labels like "A1-1", "A1-2"
 ```
 
-### Update Ticket State
+### Create Event Seats (Pricing)
 ```typescript
-// Mark as paid (with payment processing)
-POST /ticket.updateTicketStatePaid
+POST /trpc/seat.createEventSeats
+Headers: { Authorization: "Bearer <admin-token>" }
+{
+  "eventId": "event-uuid",
+  "seats": [
+    {
+      "seatId": "seat-uuid",
+      "price": 50.00,
+      "category": "VIP"
+    },
+    {
+      "seatId": "seat-uuid-2",
+      "price": 30.00,
+      "category": "Regular"
+    }
+  ]
+}
+```
+
+### Get Event Seats
+```typescript
+GET /trpc/seat.getEventSeats
 Headers: { Authorization: "Bearer <dev-token>" }
+{
+  "eventId": "event-uuid"
+}
+```
+
+### Get Event Seat Statistics
+```typescript
+GET /trpc/seat.getEventSeatsStats
+Headers: { Authorization: "Bearer <dev-token>" }
+{
+  "eventId": "event-uuid"
+}
+
+// Returns available/total seat counts
+```
+
+## Ticket Operations
+
+### Create Single Ticket
+```typescript
+POST /trpc/ticket.createTicket
+Headers: { Authorization: "Bearer <dev-token>" }
+{
+  "eventId": "event-uuid",
+  "teamId": "team-uuid", 
+  "userId": "user-uuid",
+  "seatId": "seat-uuid"
+}
+
+// Bearer info is automatically extracted from user record
+// Ticket expires in 15 minutes
+// User limited to 14 tickets total
+```
+
+### Create Gift Ticket
+```typescript
+POST /trpc/ticket.createGiftTicket
+Headers: { Authorization: "Bearer <dev-token>" }
+{
+  "eventId": "event-uuid",
+  "teamId": "team-uuid", 
+  "userId": "purchaser-user-uuid",
+  "seatId": "seat-uuid",
+  "bearer": "recipient@example.com"
+}
+
+// Bearer info extracted from recipient user record
+```
+
+### Create Group Ticket (3-5 people)
+```typescript
+POST /trpc/ticket.createGroupTicket
+Headers: { Authorization: "Bearer <dev-token>" }
+{
+  "eventId": "event-uuid",
+  "userId": "user-uuid",
+  "seatId": "main-seat-uuid",
+  "teamId": "team-uuid",
+  "group": [
+    {
+      "teamId": "team-uuid",
+      "seatId": "seat-uuid-2",
+      "bearer": {
+        "name": "Jane Doe",
+        "email": "jane@example.com",
+        "phone": "+250 788 888 889"
+      }
+    },
+    {
+      "teamId": "team-uuid",
+      "seatId": "seat-uuid-3",
+      "bearer": {
+        "name": "Bob Smith",
+        "email": "bob@example.com",
+        "phone": "+250 788 888 890"
+      }
+    }
+  ]
+}
+
+// Creates tickets for main user + 2-4 additional people
+// Total group size: 3-5 people
+```
+
+### Create Family Ticket (3-7 people)
+```typescript
+POST /trpc/ticket.createFamilyTicket
+Headers: { Authorization: "Bearer <dev-token>" }
+{
+  "eventId": "event-uuid",
+  "userId": "user-uuid",
+  "seatId": "main-seat-uuid",
+  "teamId": "team-uuid",
+  "family": [
+    // 2-6 additional family members
+    {
+      "teamId": "team-uuid",
+      "seatId": "seat-uuid-2",
+      "bearer": {
+        "name": "Family Member",
+        "email": "member@example.com",
+        "phone": "+250 788 888 891"
+      }
+    }
+  ]
+}
+
+// Creates tickets for main user + 2-6 family members
+// Total family size: 3-7 people
+```
+
+### Get Tickets
+```typescript
+// All tickets (Admin only)
+GET /trpc/ticket.getTickets
+Headers: { Authorization: "Bearer <admin-token>" }
+
+// Single ticket (Admin only)
+GET /trpc/ticket.getTicket
+Headers: { Authorization: "Bearer <admin-token>" }
+{ "id": "ticket-uuid" }
+
+// By event (Admin only)
+GET /trpc/ticket.getTicketsByEvent
+Headers: { Authorization: "Bearer <admin-token>" }
+{ "eventId": "event-uuid" }
+
+// By team (Admin only)
+GET /trpc/ticket.getTicketsByTeam
+Headers: { Authorization: "Bearer <admin-token>" }
+{ "teamId": "team-uuid" }
+
+// By state (Admin only)
+GET /trpc/ticket.getTicketByState
+Headers: { Authorization: "Bearer <admin-token>" }
+{ "state": "PENDING" | "PAID" | "USED" | "CANCELLED" | "REFUNDED" }
+
+// User's tickets (Dev access)
+GET /trpc/ticket.getUserTickets
+Headers: { Authorization: "Bearer <dev-token>" }
+{ "userId": "user-uuid" }
+
+// Returns tickets where user is owner OR bearer (gift tickets)
+// Only returns PAID and PENDING tickets
+```
+
+### Ticket State Management
+
+```typescript
+// Place Payment Order
+POST /trpc/ticket.placePaymentOrder
+Headers: { Authorization: "Bearer <dev-token>" }
+{
+  "userId": "user-uuid",
+  "tickets": [
+    { "id": "ticket-uuid-1" },
+    { "id": "ticket-uuid-2" }
+  ]
+}
+
+// Creates order record for payment processing
+// Note: Actual payment processing integration needs to be implemented
+
+// Cancel ticket (Admin only)
+POST /trpc/ticket.cancelTicket  
+Headers: { Authorization: "Bearer <admin-token>" }
 {
   "id": "ticket-uuid"
 }
 
-// Payment Processing Flow:
-// 1. Validates ticket exists and is in PENDING state
-// 2. Extracts client info and seat pricing from ticket
-// 3. Creates signed invoice with JWT using PAY_JWT_SECRET
-// 4. Sends payment request to external payment gateway
-// 5. Validates payment response and updates ticket to PAID state
-// 6. Returns success/error with detailed messaging
-
-// Required Environment Variables:
-// PAY_JWT_SECRET - Secret for signing payment invoices
-// PAY_API_URL - Payment gateway base URL
-// PAY_API_KEY - API key for payment gateway authentication
-
-// Cancel ticket
-POST /ticket.cancelTicket  
-Headers: { Authorization: "Bearer <dev-token>" }
-{
-  "id": "ticket-uuid"
-}
+// Releases seat and broadcasts SSE update
 ```
 
 ## QR Code Operations
 
 ### Generate QR Code
 ```typescript
-GET /ticket.getTicketQRCode
+GET /trpc/ticket.getTicketQRCode
 Headers: { Authorization: "Bearer <dev-token>" }
 {
   "ticketId": "ticket-uuid"
@@ -325,38 +509,55 @@ Headers: { Authorization: "Bearer <dev-token>" }
 // Returns:
 {
   "success": true,
+  "message": "Ticket QR code retrieved successfully",
   "qrCode": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...",
   "ticketInfo": {
     "event": "Concert 2024",
-    "seat": "A1-1", 
+    "seat": "seat-uuid", 
     "date": "2024-12-25T19:00:00Z",
-    "client": { "name": "John Doe", ... }
+    "client": { "name": "John Doe", "email": "...", "phone": "..." }
   }
 }
 ```
 
 ### Validate QR Code
 ```typescript
-POST /ticket.validateQRCode
-Headers: { Authorization: "Bearer <dev-token>" }
+POST /trpc/ticket.validateQRCode
+Headers: { Authorization: "Bearer <admin-token>" }
 {
-  "qrData": "base64-encoded-signed-payload"
+  "qrData": "encoded-payload.signature"
 }
 
-// Marks ticket as USED and returns validation result
+// Validates HMAC signature and marks PAID ticket as USED
+// Returns ticket details with event and seat information
+```
+
+## User Management
+
+### Get User by Email
+```typescript
+GET /trpc/user.getUser
+Headers: { Authorization: "Bearer <dev-token>" }
+{
+  "email": "user@example.com"
+}
+
+// Returns user record or null if not found
 ```
 
 ## Team Management
 
 ### Get Teams
 ```typescript
-GET /team.getTeams
+GET /trpc/team.getTeams
 Headers: { Authorization: "Bearer <dev-token>" }
+
+// Returns all teams
 ```
 
 ### Get Team Details
 ```typescript
-GET /team.getTeam
+GET /trpc/team.getTeam
 Headers: { Authorization: "Bearer <dev-token>" }
 {
   "id": "team-uuid"
@@ -365,7 +566,7 @@ Headers: { Authorization: "Bearer <dev-token>" }
 
 ### Update Team
 ```typescript
-POST /team.updateTeam
+POST /trpc/team.updateTeam
 Headers: { Authorization: "Bearer <dev-token>" }
 {
   "id": "team-uuid",
@@ -373,19 +574,29 @@ Headers: { Authorization: "Bearer <dev-token>" }
   "description": "Updated description", 
   "logoUrl": "https://example.com/new-logo.png"
 }
+
+// All fields are required
 ```
 
 ## Analytics
 
 ### Get Event Revenue
 ```typescript
-GET /analytics.getEventRevenue
+GET /trpc/analytics.getEventRevenue
 Headers: { Authorization: "Bearer <dev-token>" }
 {
   "eventId": "event-uuid"
 }
 
-// Returns total revenue from PAID and USED tickets
+// Returns:
+{
+  "success": true,
+  "message": "Event revenue retrieved successfully",
+  "revenue": 1500.00,
+  "ticketCount": 30
+}
+
+// Calculates revenue from PAID and USED tickets only
 ```
 
 ## Real-time Seat Updates (SSE)
@@ -497,15 +708,24 @@ Headers: { Authorization: "Bearer <dev-token>" }
 
 ### Required Environment Variables
 ```bash
+# Database
 DATABASE_URL="postgresql://user:password@localhost:5432/database"
+
+# UUID Generation
 UUID_NAMESPACE="6ba7b810-9dad-11d1-80b4-00c04fd430c8"
-ADMIN_JWT_SECRET="your-admin-secret"
-JWT_SECRET="your-api-secret"
-HASH_SECRET="your-hash-secret"
-QR_SECRET="your-qr-secret"
-PAY_JWT_SECRET="your-pay-jwt-secret"
+
+# JWT Secrets
+ADMIN_JWT_SECRET="your-admin-secret"     # For admin API keys
+ALPHA_JWT_SECRET="your-alpha-secret"     # For alpha login tokens
+JWT_SECRET="your-dev-secret"             # For dev API keys
+
+# Security
+HASH_SECRET="your-hash-secret"           # For password hashing
+QR_SECRET="your-qr-secret"               # For QR code signing
+
+# Payment Gateway (for future implementation)
+PAY_KEY="your-payment-key"
 PAY_API_URL="https://payment-gateway.com/api"
-PAY_API_KEY="your-pay-api-key"
 ```
 
 ### Development Setup
