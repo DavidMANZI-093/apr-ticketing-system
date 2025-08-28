@@ -33,7 +33,7 @@ export const devProcedure = t.procedure.use(async ({ ctx, next }) => {
 			});
 		}
 
-		const rateLimit = checkRateLimit(payload.keyId, 100, 3600000); // 100 requests per hour
+		const rateLimit = checkRateLimit(payload.keyId, "dev", 100, 3600000); // 100 requests per hour
 
 		if (!rateLimit.allowed) {
 			throw new TRPCError({

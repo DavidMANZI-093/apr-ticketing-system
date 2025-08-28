@@ -2,6 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { t } from "../controllers/trpc";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
+import { checkRateLimit } from "../utils/rate-limiter";
 
 dotenv.config();
 
@@ -21,22 +22,40 @@ export const adminProcedure = t.procedure.use(async ({ ctx, next }) => {
 
 	try {
 		const payload = jwt.verify(token, process.env.ADMIN_JWT_SECRET) as {
-			role: string;
+			keyId: string;
+			name: string;
 		};
-		if (payload.role !== "admin") {
+
+		if (payload.name !== "admin") {
 			throw new TRPCError({
 				code: "UNAUTHORIZED",
 				message: "Unauthorized - Invalid role",
 			});
 		}
+
+		const rateLimit = checkRateLimit(payload.keyId, "admin", 100, 3600000); // 100 requests per hour
+
+		if (!rateLimit.allowed) {
+			throw new TRPCError({
+				code: "TOO_MANY_REQUESTS",
+				message: `Rate limit exceeded. Reset at ${new Date(rateLimit.resetTime).toISOString()}`,
+			});
+		}
+
+		return next({
+			ctx: {
+				...ctx,
+				apiKey: payload,
+				rateLimit: {
+					remaining: rateLimit.remaining,
+					resetTime: rateLimit.resetTime,
+				},
+			},
+		});
 	} catch (error) {
 		throw new TRPCError({
 			code: "UNAUTHORIZED",
 			message: "Unauthorized - Invalid token",
 		});
 	}
-
-	return next({
-		ctx,
-	});
 });
