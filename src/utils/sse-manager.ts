@@ -1,5 +1,6 @@
 import { Response } from "express";
 import { logger } from "./logger";
+import { Seat } from "../types";
 
 interface SSEConnection {
 	res: Response;
@@ -51,7 +52,10 @@ class SSEManager {
 	}
 
 	// Remove connection (internal)
-	private removeConnectionInternal(eventId: string, connection: SSEConnection): void {
+	private removeConnectionInternal(
+		eventId: string,
+		connection: SSEConnection,
+	): void {
 		const eventConnections = this.connections.get(eventId);
 		if (eventConnections) {
 			eventConnections.delete(connection);
@@ -73,7 +77,10 @@ class SSEManager {
 	}
 
 	// Broadcast seating plan update to all connections for an event
-	broadcastSeatingUpdate(eventId: string, seatingPlan: Record<string, any>): void {
+	broadcastSeatingUpdate(
+		eventId: string,
+		seatingPlan: Record<string, Seat>,
+	): void {
 		const eventConnections = this.connections.get(eventId);
 		if (!eventConnections || eventConnections.size === 0) {
 			return;
@@ -193,7 +200,9 @@ class SSEManager {
 	removeConnection(eventId: string, res: Response): void {
 		const eventConnections = this.connections.get(eventId);
 		if (eventConnections) {
-			const connectionToRemove = Array.from(eventConnections).find(conn => conn.res === res);
+			const connectionToRemove = Array.from(eventConnections).find(
+				(conn) => conn.res === res,
+			);
 			if (connectionToRemove) {
 				eventConnections.delete(connectionToRemove);
 				this.connectionCount--;
@@ -243,6 +252,9 @@ class SSEManager {
 export const sseManager = new SSEManager();
 
 // Cleanup stale connections every 10 minutes
-setInterval(() => {
-	sseManager.cleanup();
-}, 10 * 60 * 1000);
+setInterval(
+	() => {
+		sseManager.cleanup();
+	},
+	10 * 60 * 1000,
+);

@@ -1,7 +1,7 @@
 import crypto from "crypto";
-import { Ticket } from "../../generated/prisma";
+import { Tickets } from "../../generated/prisma";
 
-export const generateSecureQRData = (ticket: Ticket): string => {
+export const generateSecureQRData = (ticket: Tickets): string => {
 	const payload = {
 		t: ticket.id,
 		e: ticket.eventId,

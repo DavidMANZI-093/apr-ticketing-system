@@ -14,11 +14,12 @@ setInterval(() => {
 
 export const checkRateLimit = (
 	keyId: string,
+	role: string,
 	limit: number,
 	windowMs: number,
 ): { allowed: boolean; remaining: number; resetTime: number } => {
 	const now = Date.now();
-	const key = `dev:${keyId}`;
+	const key = `${role}:${keyId}`;
 	const record = rateLimitStore.get(key);
 
 	// First request or window expired
@@ -56,8 +57,8 @@ export const checkRateLimit = (
 	};
 };
 
-export const getRateLimitStats = (keyId: string) => {
-	const record = rateLimitStore.get(`dev:${keyId}`);
+export const getRateLimitStats = (keyId: string, role: string) => {
+	const record = rateLimitStore.get(`${role}:${keyId}`);
 	if (!record) return null;
 
 	return {
