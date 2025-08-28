@@ -4,21 +4,30 @@ import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { eventRouter } from "./routes/event-router";
 import { prisma } from "./controllers/prisma";
 import cron from "node-cron";
-import { TicketState } from "../generated/prisma";
+import { OrderStatus, TicketState } from "../generated/prisma";
 import { ticketRouter } from "./routes/ticket-router";
 import { teamRouter } from "./routes/team-router";
 import { analyticsRouter } from "./routes/analytics-router";
 import { logger } from "./utils/logger";
-import { adminRouter } from "./routes/admin-router";
+import { alphaRouter } from "./routes/alpha-router";
+import { venueRouter } from "./routes/venue-router";
+import { seatRouter } from "./routes/seat-router";
+import { userRouter } from "./routes/user-router";
 import { sseManager } from "./utils/sse-manager";
-import { authenticateSSE, AuthenticatedSSERequest } from "./middleware/sse-auth";
+import {
+	authenticateSSE,
+	AuthenticatedSSERequest,
+} from "./middleware/sse-auth";
 
 const appRouter = t.router({
 	event: eventRouter,
 	ticket: ticketRouter,
 	team: teamRouter,
 	analytics: analyticsRouter,
-	admin: adminRouter,
+	venue: venueRouter,
+	seat: seatRouter,
+	user: userRouter,
+	alpha: alphaRouter,
 });
 
 export type AppRouter = typeof appRouter;
@@ -34,80 +43,83 @@ app.use(
 );
 
 // SSE endpoint for live seat updates
-app.get("/events/:eventId/seats/stream", authenticateSSE, async (req: AuthenticatedSSERequest, res) => {
-	const { eventId } = req.params;
+app.get(
+	"/events/:eventId/seats/stream",
+	authenticateSSE,
+	async (req: AuthenticatedSSERequest, res) => {
+		const { eventId } = req.params;
 
-	// Validate event exists and is active
-	try {
-		const event = await prisma.event.findUnique({
-			where: { id: eventId, active: true },
-			select: { id: true, seatingPlan: true, name: true }
-		});
+		// Validate event exists and is active
+		try {
+			const event = await prisma.events.findUnique({
+				where: { id: eventId, active: true },
+				select: { id: true, eventSeats: true, name: true },
+			});
 
-		if (!event) {
-			return res.status(404).json({
+			if (!event) {
+				return res.status(404).json({
+					success: false,
+					message: "Event not found or inactive",
+				});
+			}
+
+			// Set SSE headers
+			res.writeHead(200, {
+				"Content-Type": "text/event-stream",
+				"Cache-Control": "no-cache",
+				Connection: "keep-alive",
+				"Access-Control-Allow-Origin": "*",
+				"Access-Control-Allow-Headers": "Cache-Control, Authorization",
+			});
+
+			// Send initial seating plan
+			const initialMessage = JSON.stringify({
+				type: "seatingPlan",
+				eventId,
+				data: event.eventSeats,
+				timestamp: Date.now(),
+			});
+
+			res.write(`data: ${initialMessage}\n\n`);
+
+			// Add connection to manager
+			sseManager.addConnection(eventId, res, req.user?.keyId);
+
+			// Send keepalive every 30 seconds
+			const keepAlive = setInterval(() => {
+				try {
+					res.write(`: keepalive ${Date.now()}\n\n`);
+				} catch (error) {
+					clearInterval(keepAlive);
+				}
+			}, 30000);
+
+			// Cleanup on connection close
+			res.on("close", () => {
+				clearInterval(keepAlive);
+			});
+
+			logger.info("SSE stream established", {
+				operation: "sseStreamStart",
+				eventId,
+				eventName: event.name,
+				userId: req.user?.keyId,
+			});
+		} catch (error) {
+			logger.error("Failed to establish SSE stream", error, {
+				operation: "sseStreamError",
+				eventId,
+				userId: req.user?.keyId,
+			});
+
+			return res.status(500).json({
 				success: false,
-				message: "Event not found or inactive"
+				message: "Failed to establish stream",
+				error: error instanceof Error ? error.message : "Unknown error",
 			});
 		}
-
-		// Set SSE headers
-		res.writeHead(200, {
-			"Content-Type": "text/event-stream",
-			"Cache-Control": "no-cache",
-			"Connection": "keep-alive",
-			"Access-Control-Allow-Origin": "*",
-			"Access-Control-Allow-Headers": "Cache-Control, Authorization",
-		});
-
-		// Send initial seating plan
-		const initialMessage = JSON.stringify({
-			type: "seatingPlan",
-			eventId,
-			data: event.seatingPlan,
-			timestamp: Date.now(),
-		});
-
-		res.write(`data: ${initialMessage}\n\n`);
-
-		// Add connection to manager
-		sseManager.addConnection(eventId, res, req.user?.keyId);
-
-		// Send keepalive every 30 seconds
-		const keepAlive = setInterval(() => {
-			try {
-				res.write(`: keepalive ${Date.now()}\n\n`);
-			} catch (error) {
-				clearInterval(keepAlive);
-			}
-		}, 30000);
-
-		// Cleanup on connection close
-		res.on("close", () => {
-			clearInterval(keepAlive);
-		});
-
-		logger.info("SSE stream established", {
-			operation: "sseStreamStart",
-			eventId,
-			eventName: event.name,
-			userId: req.user?.keyId,
-		});
-
-	} catch (error) {
-		logger.error("Failed to establish SSE stream", error, {
-			operation: "sseStreamError",
-			eventId,
-			userId: req.user?.keyId,
-		});
-
-		return res.status(500).json({
-			success: false,
-			message: "Failed to establish stream",
-			error: error instanceof Error ? error.message : "Unknown error",
-		});
-	}
-});
+	},
+);
 
 // SSE stats endpoint for monitoring
 app.get("/sse/stats", authenticateSSE, (req: AuthenticatedSSERequest, res) => {
@@ -136,7 +148,7 @@ const scheduleNextCronJob = async () => {
 			try {
 				// Update events that have started to inactive
 				await prisma.$transaction(async (tx) => {
-					const result = await tx.event.updateMany({
+					const result = await tx.events.updateMany({
 						where: {
 							active: true,
 							startsAt: {
@@ -162,7 +174,7 @@ const scheduleNextCronJob = async () => {
 				// Update tickets that have expired to cancelled and release seats
 				await prisma.$transaction(async (tx) => {
 					// Get expired tickets with event data in single query
-					const expiredTickets = await tx.ticket.findMany({
+					const expiredTickets = await tx.tickets.findMany({
 						where: {
 							state: TicketState.PENDING,
 							expiresAt: {
@@ -173,86 +185,41 @@ const scheduleNextCronJob = async () => {
 							id: true,
 							seatId: true,
 							eventId: true,
-							event: {
-								select: {
-									id: true,
-									seatingPlan: true,
-								},
-							},
 						},
 					});
 
 					if (expiredTickets.length > 0) {
 						// Cancel expired tickets in batch
-						await tx.ticket.updateMany({
+						await tx.tickets.updateMany({
 							where: {
 								id: { in: expiredTickets.map((t) => t.id) },
 							},
 							data: {
 								state: TicketState.CANCELLED,
+								orderId: null,
 							},
 						});
 
-						// Group tickets by event for batch seating plan updates
-						const eventUpdates = new Map<
-							string,
-							{
-								seatingPlan: Record<
-									string,
-									{ label: string; price: number; isAvailable: boolean }
-								>;
-								seatIds: string[];
-							}
-						>();
-
-						for (const ticket of expiredTickets) {
-							if (ticket.event?.seatingPlan) {
-								const eventId = ticket.eventId;
-
-								if (!eventUpdates.has(eventId)) {
-									eventUpdates.set(eventId, {
-										seatingPlan: ticket.event.seatingPlan as Record<
-											string,
-											{ label: string; price: number; isAvailable: boolean }
-										>,
-										seatIds: [],
-									});
+						const eventSeats = await tx.eventSeats.updateMany({
+							where: {
+								seatId: {
+									in: expiredTickets.map((t) => t.seatId)
+								},
+								eventId: {
+									in: expiredTickets.map((t) => t.eventId)
 								}
-
-								eventUpdates.get(eventId)!.seatIds.push(ticket.seatId);
-							}
-						}
-
-						// Batch update seating plans per event
-						const updatePromises = Array.from(eventUpdates.entries()).map(
-							async ([eventId, { seatingPlan, seatIds }]) => {
-								// Mark all seats as available in one operation
-								for (const seatId of seatIds) {
-									if (seatingPlan[seatId]) {
-										seatingPlan[seatId].isAvailable = true;
-									}
-								}
-
-								const result = await tx.event.update({
-									where: { id: eventId },
-									data: { seatingPlan },
-								});
-
-								// Broadcast seating plan update via SSE
-								sseManager.broadcastSeatingUpdate(eventId, seatingPlan);
-
-								return result;
 							},
-						);
-
-						await Promise.all(updatePromises);
+							data: {
+								isAvailable: true,
+							}
+						})
 
 						logger.info(
-							`Cancelled ${expiredTickets.length} expired tickets and released seats across ${eventUpdates.size} events`,
+							`Cancelled ${expiredTickets.length} expired tickets and released seats across ${eventSeats.count} events`,
 							{
 								operation: "cronTicketCleanup",
 								expiredTickets: expiredTickets.length,
-								eventsAffected: eventUpdates.size,
+								eventsAffected: eventSeats.count,
 							},
 						);
 					}
@@ -273,7 +240,7 @@ const scheduleNextCronJob = async () => {
 };
 
 const getOptimalInterval = async () => {
-	const nextEvent = await prisma.event.findFirst({
+	const nextEvent = await prisma.events.findFirst({
 		where: {
 			active: true,
 			startsAt: {
