@@ -2,7 +2,6 @@ import { t } from "../controllers/trpc";
 import { z } from "zod";
 import { prisma } from "../controllers/prisma";
 import { TicketState } from "../../generated/prisma";
-import { SeatingPlan } from "../types";
 import { logger } from "../utils/logger";
 import { devProcedure } from "../middleware/dev-procedure";
 
@@ -18,12 +17,11 @@ export const analyticsRouter = t.router({
 			try {
 				return await prisma.$transaction(async (tx) => {
 					// Single query to get both tickets and event seating plan
-					const event = await tx.event.findUnique({
+					const event = await tx.events.findUnique({
 						where: {
 							id: input.eventId,
 						},
 						select: {
-							seatingPlan: true,
 							tickets: {
 								where: {
 									state: {
@@ -31,8 +29,7 @@ export const analyticsRouter = t.router({
 									},
 								},
 								select: {
-									seatId: true,
-									state: true,
+									seat: true
 								},
 							},
 						},
@@ -46,15 +43,9 @@ export const analyticsRouter = t.router({
 						};
 					}
 
-					const seatingPlan = event.seatingPlan as unknown as Record<
-						string,
-						SeatingPlan
-					>;
-
 					// Calculate revenue in a single pass
 					const revenue = event.tickets.reduce((sum, ticket) => {
-						const seat = seatingPlan[ticket.seatId];
-						return sum + (seat?.price || 0);
+						return sum + (ticket.seat.price || 0);
 					}, 0);
 
 					return {

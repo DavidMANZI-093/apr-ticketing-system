@@ -9,7 +9,7 @@ export const teamRouter = t.router({
 	getTeams: devProcedure.query(async () => {
 		try {
 			return await prisma.$transaction(async (tx) => {
-				const teams = await tx.team.findMany();
+				const teams = await tx.teams.findMany();
 				if (teams) {
 					return {
 						success: true,
@@ -46,7 +46,7 @@ export const teamRouter = t.router({
 		.query(async ({ input }) => {
 			try {
 				return await prisma.$transaction(async (tx) => {
-					const team = await tx.team.findUnique({
+					const team = await tx.teams.findUnique({
 						where: {
 							id: input.id,
 						},
@@ -56,6 +56,12 @@ export const teamRouter = t.router({
 							success: true,
 							message: "Team retrieved successfully",
 							team,
+						};
+					} else {
+						return {
+							success: true,
+							message: "No team found",
+							team: null,
 						};
 					}
 				});
@@ -85,7 +91,7 @@ export const teamRouter = t.router({
 		.mutation(async ({ input }) => {
 			try {
 				return await prisma.$transaction(async (tx) => {
-					const team = await tx.team.update({
+					const team = await tx.teams.update({
 						where: {
 							id: input.id,
 						},

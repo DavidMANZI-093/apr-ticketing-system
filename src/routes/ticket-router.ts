@@ -1,40 +1,31 @@
 import { t } from "../controllers/trpc";
 import { z } from "zod";
 import { prisma } from "../controllers/prisma";
-import parsePhoneNumber from "libphonenumber-js";
-import { TicketState } from "../../generated/prisma";
+import { TicketState, TicketType, Tickets } from "../../generated/prisma";
 import { logger } from "../utils/logger";
 import { devProcedure } from "../middleware/dev-procedure";
 import { generateSecureQRData } from "../utils/qr-code";
 import QRCode from "qrcode";
 import crypto from "crypto";
-import jwt from "jsonwebtoken";
+import { Seat } from "../types";
+import { sseManager } from "../utils/sse-manager";
+import { adminProcedure } from "../middleware/admin-procedure";
 
 export const ticketRouter = t.router({
-	// Create Ticket
+	// Create Ticket (Single)
 	createTicket: devProcedure
 		.input(
 			z.object({
 				eventId: z.string(),
 				teamId: z.string(),
-				client: z.object({
-					name: z.string(),
-					email: z.email(),
-					phone: z.string().refine((val) => {
-						try {
-							return parsePhoneNumber(val, "RW")?.isValid() ?? false;
-						} catch (error) {
-							return false;
-						}
-					}, "Invalid phone number format (e.g. +250 788 888 888)"),
-				}),
+				userId: z.string(),
 				seatId: z.string(),
 			}),
 		)
 		.mutation(async ({ input }) => {
 			try {
 				return await prisma.$transaction(async (tx) => {
-					const et = await tx.ticket.findUnique({
+					const et = await tx.tickets.findUnique({
 						where: {
 							seatId_eventId: {
 								seatId: input.seatId,
@@ -43,59 +34,108 @@ export const ticketRouter = t.router({
 						},
 					});
 
+					const team = await tx.teams.findUnique({
+						where: {
+							id: input.teamId,
+						},
+					});
+
+					if (!team) {
+						// team not found - throw error
+						throw new Error("Team not found");
+					}
+
+					const uts = await tx.tickets.findMany({
+						where: {
+							userId: input.userId,
+						},
+					});
+
+					if (uts.length >= 14) {
+						// user has reached the limit of 14 tickets - throw error
+						throw new Error("User has reached the limit of 14 tickets");
+					}
+
+					const user = await tx.users.findUnique({
+						where: {
+							id: input.userId,
+						},
+					});
+
+					if (!user) {
+						// user not found - throw error
+						throw new Error("User not found");
+					}
+
 					if (et && et.state !== TicketState.CANCELLED) {
 						// exists and not cancelled - throw error
 						throw new Error("Seat is already booked");
 					}
 
-					if (et?.state === TicketState.CANCELLED) {
+					if (et && et.state === TicketState.CANCELLED) {
 						// exists and cancelled - delete and continue
-						await tx.ticket.delete({ where: { id: et.id } });
+						await tx.tickets.delete({ where: { id: et.id } });
 					}
 
-					const ticket = await tx.ticket.create({
+					const ticket = await tx.tickets.create({
 						data: {
 							eventId: input.eventId,
 							teamId: input.teamId,
-							client: input.client,
+							userId: input.userId,
 							expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes from now
 							state: TicketState.PENDING,
 							seatId: input.seatId,
+							type: TicketType.SINGLE,
+							bearer: {
+								name: user.name,
+								email: user.email,
+								phone: user.phone,
+							},
 						},
 					});
 
 					if (ticket) {
-						// Update event seatingPlan to mark seat as unavailable
-						const event = await tx.event.findUnique({
-							where: { id: input.eventId },
-							select: { seatingPlan: true },
+						// Update event seat to mark seat as unavailable
+						const eventSeat = await tx.eventSeats.update({
+							where: {
+								eventId_seatId: {
+									eventId: input.eventId,
+									seatId: input.seatId,
+								},
+							},
+							data: {
+								isAvailable: false,
+							},
 						});
 
-						if (event?.seatingPlan) {
-							const seatingPlan = event.seatingPlan as Record<
-								string,
-								{ label: string; price: number; isAvailable: boolean }
-							>;
+						const eventSeats = await tx.eventSeats.findMany({
+							where: {
+								eventId: input.eventId,
+							},
+							include: {
+								seat: {
+									select: {
+										label: true,
+									},
+								},
+							},
+						});
 
-							if (seatingPlan[input.seatId]) {
-								seatingPlan[input.seatId].isAvailable = false;
+						if (eventSeat && eventSeats) {
+							const seatingPlan: Record<string, Seat> = eventSeats.reduce(
+								(acc, seat) => {
+									acc[seat.seatId] = {
+										isAvailable: seat.isAvailable,
+										price: seat.price,
+										label: seat.seat.label,
+										category: seat.category,
+									};
+									return acc;
+								},
+								{} as Record<string, Seat>,
+							);
 
-								await tx.event.update({
-									where: { id: input.eventId },
-									data: { seatingPlan },
-								});
-
-								// Broadcast seat update via SSE
-								const { sseManager } = await import("../utils/sse-manager");
-								const seat = seatingPlan[input.seatId];
-								sseManager.broadcastSeatUpdate(
-									input.eventId,
-									input.seatId,
-									false, // seat is now unavailable
-									seat?.price,
-									seat?.label,
-								);
-							}
+							sseManager.broadcastSeatingUpdate(input.eventId, seatingPlan);
 						}
 
 						return {
@@ -111,7 +151,491 @@ export const ticketRouter = t.router({
 					eventId: input.eventId,
 					teamId: input.teamId,
 					seatId: input.seatId,
-					clientEmail: input.client.email,
+					userId: input.userId,
+				});
+				return {
+					success: false,
+					message: "Failed to create ticket",
+					error: error instanceof Error ? error.message : "Unknown error",
+				};
+			}
+		}),
+
+	// Create Ticket (Gift)
+	createGiftTicket: devProcedure
+		.input(
+			z.object({
+				eventId: z.string(),
+				teamId: z.string(),
+				userId: z.string(),
+				seatId: z.string(),
+				bearer: z.email(),
+			}),
+		)
+		.mutation(async ({ input }) => {
+			try {
+				return await prisma.$transaction(async (tx) => {
+					const user = await tx.users.findUnique({
+						where: {
+							email: input.bearer,
+						},
+					});
+
+					const uts = await tx.tickets.findMany({
+						where: {
+							userId: input.userId,
+						},
+					});
+
+					if (uts.length >= 14) {
+						// user has reached the limit of 14 tickets - throw error
+						throw new Error("User has reached the limit of 14 tickets");
+					}
+
+					const et = await tx.tickets.findUnique({
+						where: {
+							seatId_eventId: {
+								seatId: input.seatId,
+								eventId: input.eventId,
+							},
+						},
+					});
+
+					if (et && et.state !== TicketState.CANCELLED) {
+						// exists and not cancelled - throw error
+						throw new Error("Seat is already booked");
+					}
+
+					if (et && et.state === TicketState.CANCELLED) {
+						// exists and cancelled - delete and continue
+						await tx.tickets.delete({ where: { id: et.id } });
+					}
+
+					if (!user) {
+						// user not found - throw error
+						throw new Error("Gifted user not found");
+					}
+
+					const ticket = await tx.tickets.create({
+						data: {
+							eventId: input.eventId,
+							teamId: input.teamId,
+							userId: input.userId,
+							seatId: input.seatId,
+							type: TicketType.GIFT,
+							expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes from now
+							state: TicketState.PENDING,
+							bearer: {
+								name: user.name,
+								email: user.email,
+								phone: user.phone,
+							},
+						},
+					});
+
+					if (ticket) {
+						// Update event seat to mark seat as unavailable
+						const eventSeat = await tx.eventSeats.update({
+							where: {
+								eventId_seatId: {
+									eventId: input.eventId,
+									seatId: input.seatId,
+								},
+							},
+							data: {
+								isAvailable: false,
+							},
+						});
+
+						const eventSeats = await tx.eventSeats.findMany({
+							where: {
+								eventId: input.eventId,
+							},
+							include: {
+								seat: {
+									select: {
+										label: true,
+									},
+								},
+							},
+						});
+
+						if (eventSeat && eventSeats) {
+							const seatingPlan: Record<string, Seat> = eventSeats.reduce(
+								(acc, seat) => {
+									acc[seat.seatId] = {
+										isAvailable: seat.isAvailable,
+										price: seat.price,
+										label: seat.seat.label,
+										category: seat.category,
+									};
+									return acc;
+								},
+								{} as Record<string, Seat>,
+							);
+
+							sseManager.broadcastSeatingUpdate(input.eventId, seatingPlan);
+						}
+
+						return {
+							success: true,
+							message: "Ticket created successfully",
+							ticket,
+						};
+					}
+				});
+			} catch (error) {
+				logger.error("Failed to create ticket", error, {
+					operation: "createGiftTicket",
+					eventId: input.eventId,
+					teamId: input.teamId,
+					seatId: input.seatId,
+					userId: input.userId,
+					bearer: input.bearer,
+				});
+				return {
+					success: false,
+					message: "Failed to create ticket",
+					error: error instanceof Error ? error.message : "Unknown error",
+				};
+			}
+		}),
+
+	// Create Tickets (Group)
+	createGroupTicket: devProcedure
+		.input(
+			z.object({
+				eventId: z.string(),
+				userId: z.string(),
+				seatId: z.string(),
+				teamId: z.string(),
+				group: z
+					.array(
+						z.object({
+							teamId: z.string(),
+							seatId: z.string(),
+							bearer: z.object({
+								name: z.string(),
+								email: z.string(),
+								phone: z.string(),
+							}),
+						}),
+					)
+					.min(2)
+					.max(4), // Group size must be between 3 and 5
+			}),
+		)
+		.mutation(async ({ input }) => {
+			try {
+				return await prisma.$transaction(async (tx) => {
+					const user = await tx.users.findUnique({
+						where: {
+							id: input.userId,
+						},
+					});
+
+					if (!user) {
+						// user not found - throw error
+						throw new Error("User not found");
+					}
+
+					const uts = await tx.tickets.findMany({
+						where: {
+							userId: input.userId,
+						},
+					});
+
+					if (uts.length >= 14) {
+						// user has reached the limit of 14 tickets - throw error
+						throw new Error("User has reached the limit of 14 tickets");
+					}
+
+					let tickets: Tickets[] = [];
+
+					const group = [...input.group];
+
+					group.push({
+						teamId: input.teamId,
+						seatId: input.seatId,
+						bearer: {
+							name: user.name,
+							email: user.email,
+							phone: user.phone,
+						},
+					});
+
+					for (const member of group) {
+						const et = await tx.tickets.findUnique({
+							where: {
+								seatId_eventId: {
+									seatId: member.seatId,
+									eventId: input.eventId,
+								},
+							},
+						});
+
+						if (et && et.state !== TicketState.CANCELLED) {
+							// exists and not cancelled - throw error
+							throw new Error("Seat is already booked");
+						}
+
+						if (et && et.state === TicketState.CANCELLED) {
+							// exists and cancelled - delete and continue
+							await tx.tickets.delete({ where: { id: et.id } });
+						}
+
+						if (group.filter((m) => m.seatId === member.seatId).length > 1) {
+							// seat is already booked - throw error
+							throw new Error("Seat is already booked");
+						}
+
+						const ticket = await tx.tickets.create({
+							data: {
+								eventId: input.eventId,
+								teamId: member.teamId,
+								userId: input.userId,
+								seatId: member.seatId,
+								type: TicketType.GROUP,
+								expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes from now
+								state: TicketState.PENDING,
+								bearer: member.bearer,
+							},
+						});
+
+						tickets.push(ticket);
+					}
+
+					if (tickets.length === input.group.length) {
+						// Update event seats to mark seats as unavailable
+						for (const ticket of tickets) {
+							await tx.eventSeats.update({
+								where: {
+									eventId_seatId: {
+										eventId: input.eventId,
+										seatId: ticket.seatId,
+									},
+								},
+								data: {
+									isAvailable: false,
+								},
+							});
+						}
+
+						const eventSeats = await tx.eventSeats.findMany({
+							where: {
+								eventId: input.eventId,
+							},
+							include: {
+								seat: {
+									select: {
+										label: true,
+									},
+								},
+							},
+						});
+
+						if (eventSeats) {
+							const seatingPlan: Record<string, Seat> = eventSeats.reduce(
+								(acc, seat) => {
+									acc[seat.seatId] = {
+										isAvailable: seat.isAvailable,
+										price: seat.price,
+										label: seat.seat.label,
+										category: seat.category,
+									};
+									return acc;
+								},
+								{} as Record<string, Seat>,
+							);
+
+							sseManager.broadcastSeatingUpdate(input.eventId, seatingPlan);
+						}
+
+						return {
+							success: true,
+							message: "Tickets created successfully",
+							tickets,
+						};
+					}
+				});
+			} catch (error) {
+				logger.error("Failed to create ticket", error, {
+					operation: "createGroupTicket",
+					eventId: input.eventId,
+					userId: input.userId,
+					group: input.group,
+				});
+				return {
+					success: false,
+					message: "Failed to create ticket",
+					error: error instanceof Error ? error.message : "Unknown error",
+				};
+			}
+		}),
+
+	// Create Tickets (Family)
+	createFamilyTicket: devProcedure
+		.input(
+			z.object({
+				eventId: z.string(),
+				userId: z.string(),
+				seatId: z.string(),
+				teamId: z.string(),
+				family: z
+					.array(
+						z.object({
+							teamId: z.string(),
+							seatId: z.string(),
+							bearer: z.object({
+								name: z.string(),
+								email: z.string(),
+								phone: z.string(),
+							}),
+						}),
+					)
+					.min(2)
+					.max(6), // Family size must be between 3 and 7
+			}),
+		)
+		.mutation(async ({ input }) => {
+			try {
+				return await prisma.$transaction(async (tx) => {
+					const user = await tx.users.findUnique({
+						where: {
+							id: input.userId,
+						},
+					});
+
+					if (!user) {
+						// user not found - throw error
+						throw new Error("User not found");
+					}
+
+					const uts = await tx.tickets.findMany({
+						where: {
+							userId: input.userId,
+						},
+					});
+
+					if (uts.length >= 14) {
+						// user has reached the limit of 14 tickets - throw error
+						throw new Error("User has reached the limit of 14 tickets");
+					}
+
+					let tickets: Tickets[] = [];
+
+					const family = [...input.family];
+
+					family.push({
+						teamId: input.teamId,
+						seatId: input.seatId,
+						bearer: {
+							name: user.name,
+							email: user.email,
+							phone: user.phone,
+						},
+					});
+
+					for (const member of family) {
+						const et = await tx.tickets.findUnique({
+							where: {
+								seatId_eventId: {
+									seatId: member.seatId,
+									eventId: input.eventId,
+								},
+							},
+						});
+
+						if (et && et.state !== TicketState.CANCELLED) {
+							// exists and not cancelled - throw error
+							throw new Error("Seat is already booked");
+						}
+
+						if (et && et.state === TicketState.CANCELLED) {
+							// exists and cancelled - delete and continue
+							await tx.tickets.delete({ where: { id: et.id } });
+						}
+
+						if (family.filter((m) => m.seatId === member.seatId).length > 1) {
+							// seat is already booked - throw error
+							throw new Error("Seat is already booked");
+						}
+
+						const ticket = await tx.tickets.create({
+							data: {
+								eventId: input.eventId,
+								teamId: member.teamId,
+								userId: input.userId,
+								seatId: member.seatId,
+								type: TicketType.FAMILY,
+								expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes from now
+								state: TicketState.PENDING,
+								bearer: member.bearer,
+							},
+						});
+
+						tickets.push(ticket);
+					}
+
+					if (tickets.length === family.length) {
+						// Update event seats to mark seats as unavailable
+						for (const ticket of tickets) {
+							await tx.eventSeats.update({
+								where: {
+									eventId_seatId: {
+										eventId: input.eventId,
+										seatId: ticket.seatId,
+									},
+								},
+								data: {
+									isAvailable: false,
+								},
+							});
+						}
+
+						const eventSeats = await tx.eventSeats.findMany({
+							where: {
+								eventId: input.eventId,
+							},
+							include: {
+								seat: {
+									select: {
+										label: true,
+									},
+								},
+							},
+						});
+
+						if (eventSeats) {
+							const seatingPlan: Record<string, Seat> = eventSeats.reduce(
+								(acc, seat) => {
+									acc[seat.seatId] = {
+										isAvailable: seat.isAvailable,
+										price: seat.price,
+										label: seat.seat.label,
+										category: seat.category,
+									};
+									return acc;
+								},
+								{} as Record<string, Seat>,
+							);
+
+							sseManager.broadcastSeatingUpdate(input.eventId, seatingPlan);
+						}
+
+						return {
+							success: true,
+							message: "Tickets created successfully",
+							tickets,
+						};
+					}
+				});
+			} catch (error) {
+				logger.error("Failed to create ticket", error, {
+					operation: "createFamilyTicket",
+					eventId: input.eventId,
+					userId: input.userId,
+					family: input.family,
 				});
 				return {
 					success: false,
@@ -122,10 +646,10 @@ export const ticketRouter = t.router({
 		}),
 
 	// Get All Tickets
-	getTickets: devProcedure.query(async () => {
+	getTickets: adminProcedure.query(async () => {
 		try {
 			return await prisma.$transaction(async (tx) => {
-				const tickets = await tx.ticket.findMany();
+				const tickets = await tx.tickets.findMany();
 				if (tickets) {
 					return {
 						success: true,
@@ -153,7 +677,7 @@ export const ticketRouter = t.router({
 	}),
 
 	// Get Ticket
-	getTicket: devProcedure
+	getTicket: adminProcedure
 		.input(
 			z.object({
 				id: z.string(),
@@ -162,7 +686,7 @@ export const ticketRouter = t.router({
 		.query(async ({ input }) => {
 			try {
 				return await prisma.$transaction(async (tx) => {
-					const ticket = await tx.ticket.findUnique({
+					const ticket = await tx.tickets.findUnique({
 						where: {
 							id: input.id,
 						},
@@ -189,7 +713,7 @@ export const ticketRouter = t.router({
 		}),
 
 	// Get Tickets By Event
-	getTicketsByEvent: devProcedure
+	getTicketsByEvent: adminProcedure
 		.input(
 			z.object({
 				eventId: z.string(),
@@ -198,7 +722,7 @@ export const ticketRouter = t.router({
 		.query(async ({ input }) => {
 			try {
 				return await prisma.$transaction(async (tx) => {
-					const tickets = await tx.ticket.findMany({
+					const tickets = await tx.tickets.findMany({
 						where: {
 							eventId: input.eventId,
 						},
@@ -225,7 +749,7 @@ export const ticketRouter = t.router({
 		}),
 
 	// Get Tickets By Team
-	getTicketsByTeam: devProcedure
+	getTicketsByTeam: adminProcedure
 		.input(
 			z.object({
 				teamId: z.string(),
@@ -234,7 +758,7 @@ export const ticketRouter = t.router({
 		.query(async ({ input }) => {
 			try {
 				return await prisma.$transaction(async (tx) => {
-					const tickets = await tx.ticket.findMany({
+					const tickets = await tx.tickets.findMany({
 						where: {
 							teamId: input.teamId,
 						},
@@ -261,7 +785,7 @@ export const ticketRouter = t.router({
 		}),
 
 	// Get Tickets By State
-	getTicketByState: devProcedure
+	getTicketByState: adminProcedure
 		.input(
 			z.object({
 				state: z.enum(["PENDING", "PAID", "CANCELLED", "USED"]),
@@ -270,7 +794,7 @@ export const ticketRouter = t.router({
 		.query(async ({ input }) => {
 			try {
 				return await prisma.$transaction(async (tx) => {
-					const tickets = await tx.ticket.findMany({
+					const tickets = await tx.tickets.findMany({
 						where: {
 							state: input.state,
 						},
@@ -296,8 +820,68 @@ export const ticketRouter = t.router({
 			}
 		}),
 
+	// Get user's tickets ()
+	getUserTickets: devProcedure
+		.input(
+			z.object({
+				userId: z.string(),
+			}),
+		)
+		.query(async ({ input }) => {
+			try {
+				return await prisma.$transaction(async (tx) => {
+					const user = await tx.users.findUnique({
+						where: {
+							id: input.userId,
+						},
+					});
+
+					if (!user) {
+						throw new Error("User not found");
+					}
+
+					const tickets = await tx.tickets.findMany({
+						where: {
+							OR: [
+								{
+									userId: input.userId,
+								},
+								{
+									bearer: {
+										path: ["email"],
+										equals: user.email,
+									},
+								},
+							],
+							state: {
+								in: [TicketState.PAID, TicketState.PENDING],
+							},
+						},
+					});
+
+					if (tickets) {
+						return {
+							success: true,
+							message: "Tickets retrieved successfully",
+							tickets,
+						};
+					}
+				});
+			} catch (error) {
+				logger.error("Failed to retrieve user's tickets", error, {
+					operation: "getUserTickets",
+					userId: input.userId,
+				});
+				return {
+					success: false,
+					message: "Failed to retrieve user's tickets",
+					error: error instanceof Error ? error.message : "Unknown error",
+				};
+			}
+		}),
+
 	// Cancel Ticket
-	cancelTicket: devProcedure
+	cancelTicket: adminProcedure
 		.input(
 			z.object({
 				id: z.string(),
@@ -306,7 +890,7 @@ export const ticketRouter = t.router({
 		.mutation(async ({ input }) => {
 			try {
 				return await prisma.$transaction(async (tx) => {
-					const ticket = await tx.ticket.update({
+					const ticket = await tx.tickets.update({
 						where: {
 							id: input.id,
 						},
@@ -317,36 +901,46 @@ export const ticketRouter = t.router({
 
 					if (ticket) {
 						// Release the seat and broadcast update
-						const event = await tx.event.findUnique({
-							where: { id: ticket.eventId },
-							select: { seatingPlan: true },
+						const eventSeat = await tx.eventSeats.update({
+							where: {
+								eventId_seatId: {
+									eventId: ticket.eventId,
+									seatId: ticket.seatId,
+								},
+							},
+							data: {
+								isAvailable: true,
+							},
 						});
 
-						if (event?.seatingPlan) {
-							const seatingPlan = event.seatingPlan as Record<
-								string,
-								{ label: string; price: number; isAvailable: boolean }
-							>;
+						const eventSeats = await tx.eventSeats.findMany({
+							where: {
+								eventId: ticket.eventId,
+							},
+							include: {
+								seat: {
+									select: {
+										label: true,
+									},
+								},
+							},
+						});
 
-							if (seatingPlan[ticket.seatId]) {
-								seatingPlan[ticket.seatId].isAvailable = true;
+						const seatingPlan: Record<string, Seat> = eventSeats.reduce(
+							(acc, seat) => {
+								acc[seat.seatId] = {
+									isAvailable: seat.isAvailable,
+									price: seat.price,
+									label: seat.seat.label,
+									category: seat.category,
+								};
+								return acc;
+							},
+							{} as Record<string, Seat>,
+						);
 
-								await tx.event.update({
-									where: { id: ticket.eventId },
-									data: { seatingPlan },
-								});
-
-								// Broadcast seat update via SSE
-								const { sseManager } = await import("../utils/sse-manager");
-								const seat = seatingPlan[ticket.seatId];
-								sseManager.broadcastSeatUpdate(
-									ticket.eventId,
-									ticket.seatId,
-									true, // seat is now available
-									seat?.price,
-									seat?.label,
-								);
-							}
+						if (eventSeat && eventSeats) {
+							sseManager.broadcastSeatingUpdate(ticket.eventId, seatingPlan);
 						}
 
 						return {
@@ -369,113 +963,68 @@ export const ticketRouter = t.router({
 			}
 		}),
 
-	// Update Ticket State (PENDING -> PAID)
-	updateTicketStatePaid: devProcedure
+	// Place payment order
+	placePaymentOrder: devProcedure
 		.input(
 			z.object({
-				id: z.string(),
+				userId: z.string(),
+				tickets: z
+					.array(
+						z.object({
+							id: z.string(),
+						}),
+					)
+					.min(1),
 			}),
 		)
 		.mutation(async ({ input }) => {
 			try {
 				return await prisma.$transaction(async (tx) => {
-					const eTicket = await tx.ticket.findUnique({
+					const tickets = await tx.tickets.findMany({
 						where: {
-							id: input.id,
+							id: {
+								in: input.tickets.map((ticket) => ticket.id),
+							},
 						},
 						include: {
-							event: true,
-						}
-					});
-
-					if (!eTicket) {
-						throw new Error("Ticket not found");
-					}
-
-					if (eTicket.state !== TicketState.PENDING) {
-						throw new Error("Ticket is not in PENDING state");
-					}
-
-					const client = eTicket.client as {
-						name: string,
-						phone: string,
-						email: string,
-					};
-
-					const payload = {
-						invoiceId: `ticket-${eTicket.id}`,
-						amount: (eTicket.event.seatingPlan as Record<string, { label: string; price: number; isAvailable: boolean }>) [eTicket.seatId].price,
-						currency: "RWF",
-						user: {
-							name: client.name,
-							phone: client.phone,
-							email: client.email,
-						}
-					}
-
-					if (!process.env.PAY_JWT_SECRET) {
-						throw new Error("PAY_JWT_SECRET is not defined");
-					}
-
-					const signedInvoice = jwt.sign(payload, process.env.PAY_JWT_SECRET);
-
-					const payment = await fetch(`${process.env.PAY_API_URL}/pay.pay`, {
-						method: "POST",
-						headers: {
-							"Content-Type": "application/json",
-							"Authorization": `Bearer ${process.env.PAY_API_KEY}`,
-						},
-						body: JSON.stringify({
-							signedInvoice,
-						}),
-					});
-
-					if (!payment.ok) {
-						throw new Error(`Payment gateway error: ${payment.statusText}`);
-					}
-
-					const paymentData = await payment.json() as {
-						result?: {
-							data?: {
-								success: boolean;
-								message: string;
-								data: {
-									id: string;
-									paid: boolean;
-								};
-							}
-						}
-					};
-
-					if (!paymentData.result?.data?.success) {
-						throw new Error(`Payment failed: ${paymentData.result?.data?.message || "Unknown error"}`);
-					}
-
-					const ticket = await tx.ticket.update({
-						where: {
-							id: input.id,
-						},
-						data: {
-							state: TicketState.PAID,
+							seat: {
+								select: {
+									price: true,
+								},
+							},
 						},
 					});
 
-					if (ticket) {
+					if (tickets) {
+						const order = await tx.orders.create({
+							data: {
+								userId: input.userId,
+							},
+						});
+
+						if (order) {
+							return {
+								success: true,
+								message: "Payment order placed successfully",
+								order,
+							};
+						}
+					} else {
 						return {
-							success: true,
-							message: "Ticket state updated successfully",
-							ticket,
+							success: false,
+							message: "Ticket not found",
+							order: null,
 						};
 					}
 				});
 			} catch (error) {
-				logger.error("Failed to update ticket state to paid", error, {
-					operation: "updateTicketStatePaid",
-					ticketId: input.id,
+				logger.error("Failed to place payment order", error, {
+					operation: "placePaymentOrder",
+					tickets: input.tickets,
 				});
 				return {
 					success: false,
-					message: "Failed to update ticket state",
+					message: "Failed to place payment order",
 					error: error instanceof Error ? error.message : "Unknown error",
 				};
 			}
@@ -491,7 +1040,7 @@ export const ticketRouter = t.router({
 		.query(async ({ input }) => {
 			try {
 				return await prisma.$transaction(async (tx) => {
-					const ticket = await tx.ticket.findUnique({
+					const ticket = await tx.tickets.findUnique({
 						where: {
 							id: input.ticketId,
 						},
@@ -509,14 +1058,14 @@ export const ticketRouter = t.router({
 							message: "Ticket QR code retrieved successfully",
 							qrCode: `data:image/png;base64,${qrBuffer.toString("base64")}`,
 							ticketInfo: {
-								event: await tx.event
+								event: await tx.events
 									.findUnique({ where: { id: ticket.eventId } })
 									.then((event) => event?.name),
 								seat: ticket.seatId,
-								date: await tx.event
+								date: await tx.events
 									.findUnique({ where: { id: ticket.eventId } })
 									.then((event) => event?.startsAt),
-								client: ticket.client,
+								client: ticket.bearer,
 							},
 						};
 					}
@@ -535,7 +1084,7 @@ export const ticketRouter = t.router({
 		}),
 
 	// Validate Ticket QR Code
-	validateQRCode: devProcedure
+	validateQRCode: adminProcedure
 		.input(
 			z.object({
 				qrData: z.string(),
@@ -564,7 +1113,7 @@ export const ticketRouter = t.router({
 						throw new Error("Invalid signature");
 					}
 
-					const ticket = await tx.ticket.update({
+					const ticket = await tx.tickets.update({
 						where: {
 							id: payload.t,
 							state: TicketState.PAID,
@@ -574,12 +1123,19 @@ export const ticketRouter = t.router({
 						},
 						include: {
 							event: true,
+							seat: true,
 						},
 					});
 
-					// Type-safe seatingPlan access
-					const seatingPlan = ticket.event.seatingPlan as Record<string, { label: string; price: number; isAvailable: boolean }> | null;
-					const seatLabel = seatingPlan?.[ticket.seatId]?.label || ticket.seatId;
+					const seat = await tx.seats.findUnique({
+						where: {
+							id: ticket.seat.seatId,
+						},
+					});
+
+					if (!seat) {
+						throw new Error("Seat not found");
+					}
 
 					return {
 						success: true,
@@ -587,8 +1143,8 @@ export const ticketRouter = t.router({
 						ticket: {
 							id: ticket.id,
 							event: ticket.event.name,
-							seat: seatLabel,
-							client: ticket.client,
+							seat: seat.label,
+							client: ticket.bearer,
 							startsAt: ticket.event.startsAt,
 						},
 					};
