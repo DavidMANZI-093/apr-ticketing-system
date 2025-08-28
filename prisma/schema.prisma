@@ -19,15 +19,19 @@ enum UserRole {
   DEV
 }
 
-enum TicketState {
-  PENDING
-  PAID
-  USED
-  CANCELLED
+model ApiKey {
+  id         String    @id @default(uuid()) @db.Uuid
+  name       String    @db.VarChar(255)
+  active     Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+  revokedAt  DateTime?
+  lastUsedAt DateTime?
+
+  @@index([id, active])
 }
 
-// User model - represents users with administrative roles only
-model User {
+// Admin model - represents users with administrative roles only
+model Admins {
   id        String   @id @default(uuid()) @db.Uuid
   name      String   @unique @db.VarChar(255)
   email     String   @unique @db.VarChar(255)
@@ -38,27 +42,75 @@ model User {
   updatedAt DateTime @default(now()) @updatedAt
 }
 
-model Event {
+enum TicketState {
+  PENDING
+  PAID
+  USED
+  CANCELLED
+  REFUNDED
+}
+
+enum TicketType {
+  SINGLE // Single Ticket (1 Person)
+  GROUP // Group Ticket (5 Persons)
+  FAMILY // Family Ticket (7 Persons)
+  GIFT // Gift Ticket (1 Person)
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  FAILED
+  CANCELLED
+}
+
+model Users {
+  id         String   @id @default(uuid()) @db.Uuid
+  username   String   @unique @db.VarChar(255)
+  name       String   @db.VarChar(255)
+  email      String   @unique @db.VarChar(255)
+  phone      String   @unique @db.VarChar(255)
+  subscriber Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now()) @updatedAt
+
+  tickets Tickets[]
+  orders  Orders[]
+}
+
+model Orders {
+  id        String      @id @default(uuid()) @db.Uuid
+  userId    String      @db.Uuid
+  status    OrderStatus @default(PENDING)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @default(now()) @updatedAt
+
+  user    Users     @relation(fields: [userId], references: [id])
+  tickets Tickets[]
+}
+
+model Events {
   id          String   @id @default(uuid()) @db.Uuid
   name        String   @db.VarChar(255)
   description String   @db.VarChar(1020)
-  location    String   @db.VarChar(255)
-  seatingPlan Json?    @db.JsonB
+  venueId     String   @db.Uuid
   createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
   startsAt    DateTime
   active      Boolean  @default(false)
-  updatedAt   DateTime @default(now()) @updatedAt
 
-  teams   Team[]
-  tickets Ticket[]
+  teams      Teams[]
+  tickets    Tickets[]
+  eventSeats EventSeats[]
+
+  venue Venues @relation(fields: [venueId], references: [id])
 
   @@index([active])
   @@index([startsAt])
   @@index([active, startsAt])
-  @@map("events")
 }
 
-model Team {
+model Teams {
   id          String   @id @default(uuid()) @db.Uuid
   name        String   @unique @db.VarChar(255)
   description String   @db.VarChar(1020)
@@ -67,39 +119,78 @@ model Team {
   updatedAt   DateTime @default(now()) @updatedAt
 
   eventId String @db.Uuid
-  event   Event  @relation(fields: [eventId], references: [id])
+  event   Events @relation(fields: [eventId], references: [id])
 
-  tickets Ticket[]
+  tickets Tickets[]
 }
 
-model Ticket {
+model Tickets {
   id        String      @id @default(uuid()) @db.Uuid
-  client    Json        @db.JsonB
-  teamId    String      @db.Uuid
+  userId    String      @db.Uuid
+  bearer    Json
+  orderId   String?     @db.Uuid
+  teamId    String?     @db.Uuid
+  eventId   String      @db.Uuid
+  seatId    String      @db.Uuid
+  type      TicketType
+  state     TicketState @default(PENDING)
+  expiresAt DateTime
   createdAt DateTime    @default(now())
   updatedAt DateTime    @default(now()) @updatedAt
-  expiresAt DateTime
-  seatId    String      @db.Uuid
-  state     TicketState @default(PENDING)
 
-  eventId String @db.Uuid
-  event   Event  @relation(fields: [eventId], references: [id])
-  team   Team   @relation(fields: [teamId], references: [id])
+  user  Users      @relation(fields: [userId], references: [id])
+  order Orders?    @relation(fields: [orderId], references: [id])
+  event Events     @relation(fields: [eventId], references: [id])
+  team  Teams?     @relation(fields: [teamId], references: [id])
+  seat  EventSeats @relation(fields: [seatId], references: [id])
 
-  @@unique([seatId, eventId])
+  @@unique([seatId, eventId]) // prevent double booking
   @@index([eventId])
   @@index([state])
   @@index([expiresAt])
   @@index([eventId, state])
 }
 
-model ApiKey {
-  id         String   @id @default(uuid()) @db.Uuid
-  name       String   @db.VarChar(255)
-  active     Boolean  @default(true)
-  createdAt  DateTime @default(now())
-  revokedAt  DateTime?
-  lastUsedAt DateTime?
-  
-  @@index([id, active])
+model EventSeats {
+  id          String  @id @default(uuid()) @db.Uuid
+  eventId     String  @db.Uuid
+  seatId      String  @db.Uuid
+  category    String  @db.VarChar(255)
+  price       Float
+  isAvailable Boolean @default(true)
+
+  tickets   Tickets[]
+  event     Events    @relation(fields: [eventId], references: [id])
+  seat      Seats     @relation(fields: [seatId], references: [id])
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @default(now()) @updatedAt
+
+  @@unique([eventId, seatId])
+  @@index([eventId, seatId])
+}
+
+model Seats {
+  id        String   @id @default(uuid()) @db.Uuid
+  venueId   String   @db.Uuid
+  label     String   @db.VarChar(255)
+  section   String   @db.VarChar(50) // more flexible than single char
+  row       Int
+  number    Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  eventSeats EventSeats[]
+  venue      Venues       @relation(fields: [venueId], references: [id])
+}
+
+model Venues {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @unique @db.VarChar(255)
+  description String   @db.VarChar(1020)
+  location    String   @db.VarChar(255)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  events Events[]
+  seats  Seats[]
 }
