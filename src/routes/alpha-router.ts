@@ -5,6 +5,7 @@ import bcrypt from "bcrypt";
 import { logger } from "../utils/logger";
 import { alphaProcedure } from "../middleware/alpha-procedure";
 import jwt from "jsonwebtoken";
+import { UserRole } from "../../generated/prisma";
 
 export const alphaRouter = t.router({
 	// Admin login
@@ -27,6 +28,7 @@ export const alphaRouter = t.router({
 					const user = await tx.admins.findUnique({
 						where: {
 							name: input.username,
+							role: UserRole.DEV,
 						},
 					});
 

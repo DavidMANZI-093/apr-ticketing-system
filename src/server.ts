@@ -10,6 +10,7 @@ import { teamRouter } from "./routes/team-router";
 import { analyticsRouter } from "./routes/analytics-router";
 import { logger } from "./utils/logger";
 import { alphaRouter } from "./routes/alpha-router";
+import { adminRouter } from "./routes/admin-router";
 import { venueRouter } from "./routes/venue-router";
 import { seatRouter } from "./routes/seat-router";
 import { userRouter } from "./routes/user-router";
@@ -28,6 +29,7 @@ const appRouter = t.router({
 	seat: seatRouter,
 	user: userRouter,
 	alpha: alphaRouter,
+	admin: adminRouter,
 });
 
 export type AppRouter = typeof appRouter;
