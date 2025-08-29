@@ -26,7 +26,8 @@ src/
 │   ├── dev-procedure.ts     # Developer-level JWT middleware (100 req/hour)
 │   └── sse-auth.ts         # SSE authentication middleware
 ├── routes/              # API endpoint definitions
-│   ├── alpha-router.ts      # Admin login and API key management
+│   ├── admin-router.ts      # Admin authentication and token management
+│   ├── alpha-router.ts      # DEV login and API key management
 │   ├── analytics-router.ts  # Revenue and statistics endpoints
 │   ├── event-router.ts      # Event CRUD and management
 │   ├── seat-router.ts       # Venue and seat management
@@ -46,22 +47,34 @@ src/
 ## Authentication System
 
 ### User Roles
-- **ALPHA**: Super admin access, can create API keys and manage system
-- **ADMIN**: Full system access, event and ticket management
+- **ALPHA**: Super admin access via DEV role, can create API keys and manage system
+- **ADMIN**: Full system access with dedicated admin router, event and ticket management
 - **DEV**: API access with rate limiting (100 requests/hour)
 
-### Authentication Flow
+### Authentication Flows
+
+#### Alpha Authentication (DEV Role)
 1. Alpha login with username + password + phrase (triple authentication)
-2. API key creation for different roles (dev/admin)
-3. JWT token usage with Bearer authentication
-4. Automatic rate limiting and token validation
+2. Manual API key creation for different roles (dev/admin)
+3. Long-lived tokens (1 day expiration)
+
+#### Admin Authentication (ADMIN Role)
+1. Admin login with username/email + password + phrase
+2. Automatic API key creation during login
+3. Short-lived tokens (1 hour expiration)
+4. Token refresh and logout capabilities
+
+#### General
+- JWT token usage with Bearer authentication
+- Automatic rate limiting and token validation
 
 ### Security Features
 - Bcrypt password hashing with salt
 - HMAC-SHA256 signed QR codes
-- JWT token expiration (1 day for alpha, 15 days for API keys)
+- JWT token expiration (1 day for alpha, 1 hour for admin, 15 days for API keys)
 - Rate limiting with automatic cleanup (100 requests/hour)
 - Role-based endpoint protection
+- Separate authentication flows for different user roles
 
 ## Core Features
 
@@ -119,14 +132,32 @@ All endpoints require Bearer token authentication:
 Authorization: Bearer <your-jwt-token>
 ```
 
-## Alpha/Admin Endpoints
+## Authentication Endpoints
 
-### Alpha Login
+### Alpha Login (DEV Role)
 ```typescript
 POST /trpc/alpha.login
 {
-  "username": "admin_user",
+  "username": "dev_user",
   "password": "secure_password", 
+  "phrase": "security_phrase"
+}
+
+// Response:
+{
+  "success": true,
+  "message": "User logged in successfully",
+  "user": { /* dev user object */ },
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+### Admin Login (ADMIN Role)
+```typescript
+POST /trpc/admin.login
+{
+  "nameOrEmail": "admin@example.com", // or username
+  "password": "secure_password",
   "phrase": "security_phrase"
 }
 
@@ -169,6 +200,39 @@ POST /trpc/alpha.revokeApiKey
 Headers: { Authorization: "Bearer <alpha-token>" }
 {
   "id": "api-key-uuid"
+}
+```
+
+## Admin Token Management
+
+### Refresh Admin Token
+```typescript
+POST /trpc/admin.refreshAdminToken
+Headers: { Authorization: "Bearer <admin-token>" }
+{
+  "token": "current-admin-token"
+}
+
+// Response:
+{
+  "success": true,
+  "message": "Token refreshed successfully",
+  "token": "new-admin-token"
+}
+```
+
+### Admin Logout
+```typescript
+POST /trpc/admin.logout
+Headers: { Authorization: "Bearer <admin-token>" }
+{
+  "token": "admin-token-to-revoke"
+}
+
+// Response:
+{
+  "success": true,
+  "message": "Logged out successfully"
 }
 ```
 
@@ -723,9 +787,9 @@ JWT_SECRET="your-dev-secret"             # For dev API keys
 HASH_SECRET="your-hash-secret"           # For password hashing
 QR_SECRET="your-qr-secret"               # For QR code signing
 
-# Payment Gateway (for future implementation)
-PAY_KEY="your-payment-key"
-PAY_API_URL="https://payment-gateway.com/api"
+# Payment Gateway
+PAY_API_KEY="your-payment-api-key"       # Payment gateway authentication
+PAY_API_URL="https://payment-gateway.com/api"  # Payment gateway base URL
 ```
 
 ### Development Setup
