@@ -69,7 +69,8 @@ app.get(
 			res.writeHead(200, {
 				"Content-Type": "text/event-stream",
 				"Cache-Control": "no-cache",
-				Connection: "keep-alive",
+				"Connection": "keep-alive",
+				"X-Accel-Buffering": "no",
 				"Access-Control-Allow-Origin": "*",
 				"Access-Control-Allow-Headers": "Cache-Control, Authorization",
 			});
