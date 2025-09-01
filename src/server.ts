@@ -19,6 +19,7 @@ import {
 	authenticateSSE,
 	AuthenticatedSSERequest,
 } from "./middleware/sse-auth";
+import { Seat } from "./types";
 
 const appRouter = t.router({
 	event: eventRouter,
@@ -188,10 +189,54 @@ const scheduleNextCronJob = async () => {
 							id: true,
 							seatId: true,
 							eventId: true,
+							seat: {
+								select: {
+									id: true,
+								}
+							}
 						},
 					});
 
 					if (expiredTickets.length > 0) {
+						// Group tickets by event for efficient processing
+						const ticketsByEvent = expiredTickets.reduce((acc, ticket) => {
+							if (!acc[ticket.eventId]) {
+								acc[ticket.eventId] = [];
+							}
+							acc[ticket.eventId].push(ticket);
+							return acc;
+						}, {} as Record<string, typeof expiredTickets>);
+
+						const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+						// Process each event's tickets
+						for (const [eventId, eventTickets] of Object.entries(ticketsByEvent)) {
+							const updatedSeats = await tx.eventSeats.findMany({
+								where: {
+									eventId,
+									seatId: { in: eventTickets.map(t => t.seatId) }
+								},
+								select: {
+									price: true,
+									category: true,
+									seatId: true,
+									seat: {
+										select: {
+											label: true,
+										}
+									}
+								}
+							});
+
+							const seatUpdates: Record<string, Seat> = updatedSeats.reduce((acc, seat) => {
+								acc[seat.seatId] = { ...seat, label: seat.seat.label, isAvailable: true };
+								return acc;
+							}, {} as Record<string, Seat>);
+
+							sseManager.broadcastSeatingUpdate(eventId, seatUpdates);
+							await delay(50);
+						}
+
 						// Cancel expired tickets in batch
 						await tx.tickets.updateMany({
 							where: {
@@ -222,7 +267,7 @@ const scheduleNextCronJob = async () => {
 							{
 								operation: "cronTicketCleanup",
 								expiredTickets: expiredTickets.length,
-								eventsAffected: eventSeats.count,
+								eventsAffected: Object.keys(ticketsByEvent).length,
 							},
 						);
 					}
