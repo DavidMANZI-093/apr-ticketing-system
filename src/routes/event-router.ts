@@ -149,7 +149,7 @@ export const eventRouter = t.router({
 				id: z.string(),
 			}),
 		)
-		.query(async ({ input }) => {
+		.mutation(async ({ input }) => {
 			try {
 				return await prisma.$transaction(async (tx) => {
 					const event = await tx.events.findUnique({
