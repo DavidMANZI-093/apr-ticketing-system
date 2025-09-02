@@ -176,12 +176,29 @@ app.get('/health', async (req, res) => {
 			database: 'connected',
 			version: process.env.npm_package_version || 'unknown',
 		});
+
+		logger.info("Health check successful", {
+			operation: "healthCheck",
+			timestamp: new Date().toISOString(),
+			uptime: process.uptime(),
+			memory: {
+				used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + 'MB',
+				total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024) + 'MB',
+			},
+			version: process.env.npm_package_version || 'unknown',
+		})
 	} catch (error) {
 		res.status(503).json({
 			status: 'unhealthy',
 			timestamp: new Date().toISOString(),
 			error: 'Database connection failed'
 		});
+
+		logger.error("Health check failed", {
+			operation: "healthCheck",
+			timestamp: new Date().toISOString(),
+			error: 'Database connection failed'
+		})
 	}
 })
 
