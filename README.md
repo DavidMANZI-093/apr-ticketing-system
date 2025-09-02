@@ -339,6 +339,52 @@ Headers: { Authorization: "Bearer <admin-token>" }
 }
 ```
 
+### Get All Venues
+```typescript
+GET /trpc/venue.getAllVenues
+Headers: { Authorization: "Bearer <dev-token>" }
+
+// Returns all venues in the system
+```
+
+### Get Venue Details
+```typescript
+GET /trpc/venue.getVenue
+Headers: { Authorization: "Bearer <dev-token>" }
+{
+  "id": "venue-uuid"
+}
+
+// Returns single venue details or null if not found
+```
+
+### Update Venue
+```typescript
+POST /trpc/venue.updateVenue
+Headers: { Authorization: "Bearer <admin-token>" }
+{
+  "id": "venue-uuid",
+  "name": "Updated Arena Name", // optional
+  "description": "Updated venue description", // optional
+  "location": { // optional
+    "longitude": -1.9500,
+    "latitude": 30.0700
+  }
+}
+```
+
+### Delete Venue
+```typescript
+POST /trpc/venue.deleteVenue
+Headers: { Authorization: "Bearer <admin-token>" }
+{
+  "id": "venue-uuid"
+}
+
+// Permanently removes venue from system
+// Note: Ensure no active events are associated with venue
+```
+
 ### Create Seats for Venue
 ```typescript
 POST /trpc/seat.createSeats
