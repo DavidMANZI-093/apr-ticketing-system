@@ -1,0 +1,9 @@
+name: Keep Alive
+on:
+  schedule:
+    - cron: '* * * * *' # every minute
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - run: curl -f ${{ secrets.API_BASE_URL }}/health

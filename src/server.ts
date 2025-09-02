@@ -160,6 +160,31 @@ app.get("/sse/stats", authenticateSSE, (req: AuthenticatedSSERequest, res) => {
 	});
 });
 
+app.get('/health', async (req, res) => {
+	try {
+		// Quick database ping
+		await prisma.$queryRaw`SELECT 1`;
+
+		res.status(200).json({
+			status: 'healthy',
+			timestamp: new Date().toISOString(),
+			uptime: process.uptime(),
+			memory: {
+				used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + 'MB',
+				total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024) + 'MB',
+			},
+			database: 'connected',
+			version: process.env.npm_package_version || 'unknown',
+		});
+	} catch (error) {
+		res.status(503).json({
+			status: 'unhealthy',
+			timestamp: new Date().toISOString(),
+			error: 'Database connection failed'
+		});
+	}
+})
+
 app.listen(3000, () => {
 	console.log("Server running on http://localhost:3000");
 });
