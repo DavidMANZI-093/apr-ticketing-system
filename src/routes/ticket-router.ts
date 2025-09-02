@@ -689,7 +689,7 @@ export const ticketRouter = t.router({
 				id: z.string(),
 			}),
 		)
-		.query(async ({ input }) => {
+		.mutation(async ({ input }) => {
 			try {
 				return await prisma.$transaction(async (tx) => {
 					const ticket = await tx.tickets.findUnique({
@@ -725,7 +725,7 @@ export const ticketRouter = t.router({
 				eventId: z.string(),
 			}),
 		)
-		.query(async ({ input }) => {
+		.mutation(async ({ input }) => {
 			try {
 				return await prisma.$transaction(async (tx) => {
 					const tickets = await tx.tickets.findMany({
@@ -761,7 +761,7 @@ export const ticketRouter = t.router({
 				teamId: z.string(),
 			}),
 		)
-		.query(async ({ input }) => {
+		.mutation(async ({ input }) => {
 			try {
 				return await prisma.$transaction(async (tx) => {
 					const tickets = await tx.tickets.findMany({
@@ -797,7 +797,7 @@ export const ticketRouter = t.router({
 				state: z.enum(["PENDING", "PAID", "CANCELLED", "USED"]),
 			}),
 		)
-		.query(async ({ input }) => {
+		.mutation(async ({ input }) => {
 			try {
 				return await prisma.$transaction(async (tx) => {
 					const tickets = await tx.tickets.findMany({
@@ -833,7 +833,7 @@ export const ticketRouter = t.router({
 				userId: z.string(),
 			}),
 		)
-		.query(async ({ input }) => {
+		.mutation(async ({ input }) => {
 			try {
 				return await prisma.$transaction(async (tx) => {
 					const user = await tx.users.findUnique({
@@ -1043,7 +1043,7 @@ export const ticketRouter = t.router({
 				ticketId: z.string(),
 			}),
 		)
-		.query(async ({ input }) => {
+		.mutation(async ({ input }) => {
 			try {
 				return await prisma.$transaction(async (tx) => {
 					const ticket = await tx.tickets.findUnique({

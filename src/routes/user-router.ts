@@ -11,7 +11,7 @@ export const userRouter = t.router({
 				email: z.email(),
 			}),
 		)
-		.query(async ({ input }) => {
+		.mutation(async ({ input }) => {
 			try {
 				return await prisma.$transaction(async (tx) => {
 					const user = await tx.users.findUnique({

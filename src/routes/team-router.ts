@@ -43,7 +43,7 @@ export const teamRouter = t.router({
 				id: z.string(),
 			}),
 		)
-		.query(async ({ input }) => {
+		.mutation(async ({ input }) => {
 			try {
 				return await prisma.$transaction(async (tx) => {
 					const team = await tx.teams.findUnique({

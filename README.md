@@ -370,7 +370,7 @@ Headers: { Authorization: "Bearer <dev-token>" }
 
 ### Get Venue Details
 ```typescript
-GET /trpc/venue.getVenue
+POST /trpc/venue.getVenue
 Headers: { Authorization: "Bearer <dev-token>" }
 {
   "id": "venue-uuid"
@@ -620,27 +620,27 @@ GET /trpc/ticket.getTickets
 Headers: { Authorization: "Bearer <admin-token>" }
 
 // Single ticket (Admin only)
-GET /trpc/ticket.getTicket
+POST /trpc/ticket.getTicket
 Headers: { Authorization: "Bearer <admin-token>" }
 { "id": "ticket-uuid" }
 
 // By event (Admin only)
-GET /trpc/ticket.getTicketsByEvent
+POST /trpc/ticket.getTicketsByEvent
 Headers: { Authorization: "Bearer <admin-token>" }
 { "eventId": "event-uuid" }
 
 // By team (Admin only)
-GET /trpc/ticket.getTicketsByTeam
+POST /trpc/ticket.getTicketsByTeam
 Headers: { Authorization: "Bearer <admin-token>" }
 { "teamId": "team-uuid" }
 
 // By state (Admin only)
-GET /trpc/ticket.getTicketByState
+POST /trpc/ticket.getTicketByState
 Headers: { Authorization: "Bearer <admin-token>" }
 { "state": "PENDING" | "PAID" | "USED" | "CANCELLED" | "REFUNDED" }
 
 // User's tickets (Dev access)
-GET /trpc/ticket.getUserTickets
+POST /trpc/ticket.getUserTickets
 Headers: { Authorization: "Bearer <dev-token>" }
 { "userId": "user-uuid" }
 
@@ -679,7 +679,7 @@ Headers: { Authorization: "Bearer <admin-token>" }
 
 ### Generate QR Code
 ```typescript
-GET /trpc/ticket.getTicketQRCode
+POST /trpc/ticket.getTicketQRCode
 Headers: { Authorization: "Bearer <dev-token>" }
 {
   "ticketId": "ticket-uuid"
@@ -715,7 +715,7 @@ Headers: { Authorization: "Bearer <admin-token>" }
 
 ### Get User by Email
 ```typescript
-GET /trpc/user.getUser
+POST /trpc/user.getUser
 Headers: { Authorization: "Bearer <dev-token>" }
 {
   "email": "user@example.com"
@@ -736,7 +736,7 @@ Headers: { Authorization: "Bearer <dev-token>" }
 
 ### Get Team Details
 ```typescript
-GET /trpc/team.getTeam
+POST /trpc/team.getTeam
 Headers: { Authorization: "Bearer <dev-token>" }
 {
   "id": "team-uuid"
@@ -761,7 +761,7 @@ Headers: { Authorization: "Bearer <dev-token>" }
 
 ### Get Event Revenue
 ```typescript
-GET /trpc/analytics.getEventRevenue
+POST /trpc/analytics.getEventRevenue
 Headers: { Authorization: "Bearer <dev-token>" }
 {
   "eventId": "event-uuid"

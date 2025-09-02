@@ -13,7 +13,7 @@ export const analyticsRouter = t.router({
 				eventId: z.string(),
 			}),
 		)
-		.query(async ({ input }) => {
+		.mutation(async ({ input }) => {
 			try {
 				return await prisma.$transaction(async (tx) => {
 					// Single query to get both tickets and event seating plan
