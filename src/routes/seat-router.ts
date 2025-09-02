@@ -107,7 +107,7 @@ export const seatRouter = t.router({
 				venueId: z.string(),
 			}),
 		)
-		.query(async ({ input }) => {
+		.mutation(async ({ input }) => {
 			try {
 				return await prisma.$transaction(async (tx) => {
 					const seats = await tx.seats.findMany({

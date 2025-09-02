@@ -283,13 +283,34 @@ Headers: { Authorization: "Bearer <admin-token>" }
 
 ### Get Event Details
 ```typescript
-GET /trpc/event.getEvent
+POST /trpc/event.getEvent
 Headers: { Authorization: "Bearer <dev-token>" }
 {
   "id": "event-uuid"
 }
 
-// Returns single event if active
+// Response:
+{
+  "success": true,
+  "message": "Event retrieved successfully",
+  "event": {
+    "id": "event-uuid",
+    "name": "Concert 2024",
+    "description": "Amazing live performance",
+    "startsAt": "2024-12-25T19:00:00Z",
+    "active": true,
+    "teams": [
+      {
+        "id": "team-uuid-1",
+        "name": "Team Alpha"
+      },
+      {
+        "id": "team-uuid-2", 
+        "name": "Team Beta"
+      }
+    ]
+  }
+}
 ```
 
 ### Update Event
@@ -383,6 +404,31 @@ Headers: { Authorization: "Bearer <admin-token>" }
 
 // Permanently removes venue from system
 // Note: Ensure no active events are associated with venue
+```
+
+### Get Seats by Venue
+```typescript
+POST /trpc/seat.getSeatsByVenue
+Headers: { Authorization: "Bearer <dev-token>" }
+{
+  "venueId": "venue-uuid"
+}
+
+// Response:
+{
+  "success": true,
+  "message": "Seats retrieved successfully",
+  "seats": [
+    {
+      "id": "seat-uuid",
+      "venueId": "venue-uuid",
+      "label": "A1-1",
+      "section": "A",
+      "row": 1,
+      "number": 1
+    }
+  ]
+}
 ```
 
 ### Create Seats for Venue
