@@ -202,7 +202,7 @@ export const seatRouter = t.router({
 				eventId: z.string(),
 			}),
 		)
-		.query(async ({ input }) => {
+		.mutation(async ({ input }) => {
 			try {
 				return await prisma.$transaction(async (tx) => {
 					const eventSeats = await tx.eventSeats.findMany({
@@ -246,7 +246,7 @@ export const seatRouter = t.router({
 				seatId: z.string(),
 			}),
 		)
-		.query(async ({ input }) => {
+		.mutation(async ({ input }) => {
 			try {
 				return await prisma.$transaction(async (tx) => {
 					const eventSeat = await tx.eventSeats.findUnique({
@@ -293,7 +293,7 @@ export const seatRouter = t.router({
 				eventId: z.string(),
 			}),
 		)
-		.query(async ({ input }) => {
+		.mutation(async ({ input }) => {
 			try {
 				return await prisma.$transaction(async (tx) => {
 					const eventSeats = await tx.eventSeats.findMany({

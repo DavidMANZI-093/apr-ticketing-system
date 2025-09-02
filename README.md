@@ -431,22 +431,45 @@ Headers: { Authorization: "Bearer <admin-token>" }
 
 ### Get Event Seats
 ```typescript
-GET /trpc/seat.getEventSeats
+POST /trpc/seat.getEventSeats
 Headers: { Authorization: "Bearer <dev-token>" }
 {
   "eventId": "event-uuid"
+}
+
+// Response:
+{
+  "success": true,
+  "message": "Event seats retrieved successfully",
+  "eventSeats": [
+    {
+      "id": "event-seat-uuid",
+      "seatId": "seat-uuid",
+      "price": 50.00,
+      "category": "VIP",
+      "isAvailable": true
+    }
+  ]
 }
 ```
 
 ### Get Event Seat Statistics
 ```typescript
-GET /trpc/seat.getEventSeatsStats
+POST /trpc/seat.getEventSeatsStats
 Headers: { Authorization: "Bearer <dev-token>" }
 {
   "eventId": "event-uuid"
 }
 
-// Returns available/total seat counts
+// Response:
+{
+  "success": true,
+  "message": "Event seats stats retrieved successfully",
+  "status": {
+    "availableSeats": 45,
+    "totalSeats": 100
+  }
+}
 ```
 
 ## Ticket Operations
