@@ -56,7 +56,19 @@ app.get(
 		try {
 			const event = await prisma.events.findUnique({
 				where: { id: eventId, active: true },
-				select: { id: true, eventSeats: true, name: true },
+				select: {
+					id: true,
+					eventSeats: {
+						select: {
+							seatId: true,
+							isAvailable: true,
+							price: true,
+							category: true,
+							seat: { select: { label: true } },
+						},
+					},
+					name: true,
+				},
 			});
 
 			if (!event) {
@@ -70,17 +82,30 @@ app.get(
 			res.writeHead(200, {
 				"Content-Type": "text/event-stream",
 				"Cache-Control": "no-cache",
-				"Connection": "keep-alive",
+				Connection: "keep-alive",
 				"X-Accel-Buffering": "no",
 				"Access-Control-Allow-Origin": "*",
 				"Access-Control-Allow-Headers": "Cache-Control, Authorization",
 			});
 
+			const seatingPlan = event.eventSeats.reduce(
+				(acc, seat) => {
+					acc[seat.seatId] = {
+						isAvailable: seat.isAvailable,
+						price: seat.price,
+						label: seat.seat.label,
+						category: seat.category,
+					};
+					return acc;
+				},
+				{} as Record<string, Seat>,
+			);
+
 			// Send initial seating plan
 			const initialMessage = JSON.stringify({
 				type: "seatingPlan",
 				eventId,
-				data: event.eventSeats,
+				data: seatingPlan,
 				timestamp: Date.now(),
 			});
 
@@ -189,53 +214,24 @@ const scheduleNextCronJob = async () => {
 							id: true,
 							seatId: true,
 							eventId: true,
-							seat: {
-								select: {
-									id: true,
-								}
-							}
 						},
 					});
 
 					if (expiredTickets.length > 0) {
 						// Group tickets by event for efficient processing
-						const ticketsByEvent = expiredTickets.reduce((acc, ticket) => {
-							if (!acc[ticket.eventId]) {
-								acc[ticket.eventId] = [];
-							}
-							acc[ticket.eventId].push(ticket);
-							return acc;
-						}, {} as Record<string, typeof expiredTickets>);
-
-						const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-						// Process each event's tickets
-						for (const [eventId, eventTickets] of Object.entries(ticketsByEvent)) {
-							const updatedSeats = await tx.eventSeats.findMany({
-								where: {
-									eventId,
-									seatId: { in: eventTickets.map(t => t.seatId) }
-								},
-								select: {
-									price: true,
-									category: true,
-									seatId: true,
-									seat: {
-										select: {
-											label: true,
-										}
-									}
+						const ticketsByEvent = expiredTickets.reduce(
+							(acc, ticket) => {
+								if (!acc[ticket.eventId]) {
+									acc[ticket.eventId] = [];
 								}
-							});
-
-							const seatUpdates: Record<string, Seat> = updatedSeats.reduce((acc, seat) => {
-								acc[seat.seatId] = { ...seat, label: seat.seat.label, isAvailable: true };
+								acc[ticket.eventId].push(ticket);
 								return acc;
-							}, {} as Record<string, Seat>);
+							},
+							{} as Record<string, typeof expiredTickets>,
+						);
 
-							sseManager.broadcastSeatingUpdate(eventId, seatUpdates);
-							await delay(50);
-						}
+						const delay = (ms: number) =>
+							new Promise((resolve) => setTimeout(resolve, ms));
 
 						// Cancel expired tickets in batch
 						await tx.tickets.updateMany({
@@ -250,7 +246,7 @@ const scheduleNextCronJob = async () => {
 
 						const eventSeats = await tx.eventSeats.updateMany({
 							where: {
-								seatId: {
+								id: {
 									in: expiredTickets.map((t) => t.seatId),
 								},
 								eventId: {
@@ -261,6 +257,46 @@ const scheduleNextCronJob = async () => {
 								isAvailable: true,
 							},
 						});
+
+						// Process each event's tickets
+						for (const [eventId, eventTickets] of Object.entries(
+							ticketsByEvent,
+						)) {
+							const updatedSeats = await tx.eventSeats.findMany({
+								where: {
+									eventId,
+									seatId: { in: eventTickets.map((t) => t.seatId) },
+								},
+								select: {
+									price: true,
+									category: true,
+									seatId: true,
+									seat: {
+										select: {
+											label: true,
+										},
+									},
+								},
+							});
+
+							const seatUpdates: Record<string, Seat> = updatedSeats.reduce(
+								(acc, seat) => {
+									acc[seat.seatId] = {
+										isAvailable: true,
+										price: seat.price,
+										label: seat.seat.label,
+										category: seat.category,
+									};
+									return acc;
+								},
+								{} as Record<string, Seat>,
+							);
+
+							if (updatedSeats.length > 0) {
+								sseManager.broadcastSeatingUpdate(eventId, seatUpdates);
+							}
+							await delay(50);
+						}
 
 						logger.info(
 							`Cancelled ${expiredTickets.length} expired tickets and released seats across ${eventSeats.count} events`,

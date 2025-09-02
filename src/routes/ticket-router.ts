@@ -274,7 +274,9 @@ export const ticketRouter = t.router({
 								{} as Record<string, Seat>,
 							);
 
-							sseManager.broadcastSeatingUpdate(input.eventId, seatingPlan);
+							if (eventSeats.length > 0) {
+								sseManager.broadcastSeatingUpdate(input.eventId, seatingPlan);
+							}
 						}
 
 						return {
@@ -448,7 +450,9 @@ export const ticketRouter = t.router({
 								{} as Record<string, Seat>,
 							);
 
-							sseManager.broadcastSeatingUpdate(input.eventId, seatingPlan);
+							if (eventSeats.length > 0) {
+								sseManager.broadcastSeatingUpdate(input.eventId, seatingPlan);
+							}
 						}
 
 						return {
@@ -620,7 +624,9 @@ export const ticketRouter = t.router({
 								{} as Record<string, Seat>,
 							);
 
-							sseManager.broadcastSeatingUpdate(input.eventId, seatingPlan);
+							if (eventSeats.length > 0) {
+								sseManager.broadcastSeatingUpdate(input.eventId, seatingPlan);
+							}
 						}
 
 						return {
