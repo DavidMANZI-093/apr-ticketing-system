@@ -65,13 +65,25 @@ class SSEManager {
 					timestamp: Date.now(),
 				});
 				connection.res.write(`data: ${keepaliveMessage}\n\n`);
+
+				logger.info("SSE keepalive sent", {
+					operation: "sseKeepalive",
+					eventId: connection.eventId,
+					userId: connection.userId,
+				});
 			} catch (error) {
 				// Connection is dead, cleanup will be handled by broadcast error detection
 				if (connection.keepaliveInterval) {
 					clearInterval(connection.keepaliveInterval);
 				}
+
+				logger.error("SSE keepalive failed", error, {
+					operation: "sseKeepaliveError",
+					eventId: connection.eventId,
+					userId: connection.userId,
+				});
 			}
-		}, 25 * 60 * 1000); // 25 minutes
+		}, 5 * 60 * 1000); // 5 minutes
 	}
 
 	// Remove connection (internal)
