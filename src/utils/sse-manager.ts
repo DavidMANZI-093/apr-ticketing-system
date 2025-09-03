@@ -258,7 +258,7 @@ class SSEManager {
 	cleanup(): void {
 		let cleaned = 0;
 		const now = Date.now();
-		const maxAge = 30 * 60 * 1000; // 30 minutes
+		const maxAge = 1 * 60 * 60 * 1000; // 1 hour
 
 		this.connections.forEach((eventConnections, eventId) => {
 			const staleConnections: SSEConnection[] = [];
