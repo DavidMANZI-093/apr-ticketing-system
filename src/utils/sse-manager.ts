@@ -7,6 +7,7 @@ interface SSEConnection {
 	eventId: string;
 	userId?: string;
 	connectedAt: number;
+	keepaliveInterval?: NodeJS.Timeout;
 }
 
 class SSEManager {
@@ -36,6 +37,9 @@ class SSEManager {
 			totalConnections: this.connectionCount,
 		});
 
+		// Start keepalive for this connection
+		this.startKeepalive(connection);
+
 		// Handle connection cleanup
 		res.on("close", () => {
 			this.removeConnectionInternal(eventId, connection);
@@ -51,6 +55,25 @@ class SSEManager {
 		});
 	}
 
+	// Start keepalive for a connection
+	private startKeepalive(connection: SSEConnection): void {
+		// Send keepalive every 25 minutes (before 30min timeout)
+		connection.keepaliveInterval = setInterval(() => {
+			try {
+				const keepaliveMessage = JSON.stringify({
+					type: "keepalive",
+					timestamp: Date.now(),
+				});
+				connection.res.write(`data: ${keepaliveMessage}\n\n`);
+			} catch (error) {
+				// Connection is dead, cleanup will be handled by broadcast error detection
+				if (connection.keepaliveInterval) {
+					clearInterval(connection.keepaliveInterval);
+				}
+			}
+		}, 25 * 60 * 1000); // 25 minutes
+	}
+
 	// Remove connection (internal)
 	private removeConnectionInternal(
 		eventId: string,
@@ -58,6 +81,11 @@ class SSEManager {
 	): void {
 		const eventConnections = this.connections.get(eventId);
 		if (eventConnections) {
+			// Clear keepalive interval
+			if (connection.keepaliveInterval) {
+				clearInterval(connection.keepaliveInterval);
+			}
+
 			eventConnections.delete(connection);
 			this.connectionCount--;
 
