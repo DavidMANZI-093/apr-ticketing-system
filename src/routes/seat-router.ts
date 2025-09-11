@@ -13,7 +13,7 @@ export const seatRouter = t.router({
 				venueId: z.string(),
 				seats: z.array(
 					z.object({
-						section: z.string(),
+						sectionId: z.string(),
 						row: z.number(),
 						number: z.number(),
 					}),
@@ -37,14 +37,34 @@ export const seatRouter = t.router({
 						};
 					}
 
-					const seats = await tx.seats.createMany({
-						data: input.seats.map((seat) => ({
+					// Verify all sections exist
+					const sectionIds = [...new Set(input.seats.map(seat => seat.sectionId))];
+					const sections = await tx.seatSections.findMany({
+						where: {
+							id: { in: sectionIds },
 							venueId: input.venueId,
-							label: `${seat.section}${seat.row}-${seat.number}`,
-							section: seat.section,
-							row: seat.row,
-							number: seat.number,
-						})),
+						},
+					});
+
+					if (sections.length !== sectionIds.length) {
+						return {
+							success: false,
+							message: "One or more sections not found",
+							seats: null,
+						};
+					}
+
+					const seats = await tx.seats.createMany({
+						data: input.seats.map((seat) => {
+							const section = sections.find(s => s.id === seat.sectionId);
+							return {
+								venueId: input.venueId,
+								label: `${section?.name}${seat.row}-${seat.number}`,
+								sectionId: seat.sectionId,
+								row: seat.row,
+								number: seat.number,
+							};
+						}),
 					});
 
 					if (seats) {
@@ -113,6 +133,15 @@ export const seatRouter = t.router({
 					const seats = await tx.seats.findMany({
 						where: {
 							venueId: input.venueId,
+						},
+						include: {
+							section: {
+								select: {
+									id: true,
+									name: true,
+									svgPathData: true,
+								},
+							},
 						},
 					});
 

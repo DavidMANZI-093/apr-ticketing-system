@@ -55,7 +55,17 @@ export const venueRouter = t.router({
 	getAllVenues: devProcedure.query(async () => {
 		try {
 			return await prisma.$transaction(async (tx) => {
-				const venues = await tx.venues.findMany();
+				const venues = await tx.venues.findMany({
+					include: {
+						sections: {
+							select: {
+								id: true,
+								name: true,
+								svgPathData: true,
+							},
+						},
+					},
+				});
 				if (venues) {
 					return {
 						success: true,
@@ -95,6 +105,15 @@ export const venueRouter = t.router({
 					const venue = await tx.venues.findUnique({
 						where: {
 							id: input.id,
+						},
+						include: {
+							sections: {
+								select: {
+									id: true,
+									name: true,
+									svgPathData: true,
+								},
+							},
 						},
 					});
 
@@ -223,6 +242,177 @@ export const venueRouter = t.router({
 				return {
 					success: false,
 					message: "Failed to delete venue",
+					error: error instanceof Error ? error.message : "Unknown error",
+				};
+			}
+		}),
+
+	// Create Seat Section
+	createSeatSection: adminProcedure
+		.input(
+			z.object({
+				venueId: z.string(),
+				name: z.string(),
+				svgPathData: z.string(),
+			}),
+		)
+		.mutation(async ({ input }) => {
+			try {
+				return await prisma.$transaction(async (tx) => {
+					const venue = await tx.venues.findUnique({
+						where: {
+							id: input.venueId,
+						},
+					});
+
+					if (!venue) {
+						return {
+							success: false,
+							message: "Venue not found",
+							section: null,
+						};
+					}
+
+					const section = await tx.seatSections.create({
+						data: {
+							venueId: input.venueId,
+							name: input.name,
+							svgPathData: input.svgPathData,
+						},
+					});
+
+					if (section) {
+						return {
+							success: true,
+							message: "Seat section created successfully",
+							section,
+						};
+					}
+				});
+			} catch (error) {
+				logger.error("Failed to create seat section", error, {
+					operation: "createSeatSection",
+					venueId: input.venueId,
+					name: input.name,
+				});
+				return {
+					success: false,
+					message: "Failed to create seat section",
+					error: error instanceof Error ? error.message : "Unknown error",
+				};
+			}
+		}),
+
+	// Get Venue Sections
+	getVenueSections: devProcedure
+		.input(
+			z.object({
+				venueId: z.string(),
+			}),
+		)
+		.mutation(async ({ input }) => {
+			try {
+				return await prisma.$transaction(async (tx) => {
+					const sections = await tx.seatSections.findMany({
+						where: {
+							venueId: input.venueId,
+						},
+					});
+
+					return {
+						success: true,
+						message: sections.length > 0 ? "Sections retrieved successfully" : "No sections found",
+						sections,
+					};
+				});
+			} catch (error) {
+				logger.error("Failed to retrieve venue sections", error, {
+					operation: "getVenueSections",
+					venueId: input.venueId,
+				});
+				return {
+					success: false,
+					message: "Failed to retrieve sections",
+					error: error instanceof Error ? error.message : "Unknown error",
+				};
+			}
+		}),
+
+	// Update Seat Section
+	updateSeatSection: adminProcedure
+		.input(
+			z.object({
+				id: z.string(),
+				name: z.string().optional(),
+				svgPathData: z.string().optional(),
+			}),
+		)
+		.mutation(async ({ input }) => {
+			try {
+				return await prisma.$transaction(async (tx) => {
+					const section = await tx.seatSections.update({
+						where: {
+							id: input.id,
+						},
+						data: {
+							...(input.name !== undefined && { name: input.name }),
+							...(input.svgPathData !== undefined && { svgPathData: input.svgPathData }),
+						},
+					});
+
+					if (section) {
+						return {
+							success: true,
+							message: "Seat section updated successfully",
+							section,
+						};
+					}
+				});
+			} catch (error) {
+				logger.error("Failed to update seat section", error, {
+					operation: "updateSeatSection",
+					sectionId: input.id,
+				});
+				return {
+					success: false,
+					message: "Failed to update seat section",
+					error: error instanceof Error ? error.message : "Unknown error",
+				};
+			}
+		}),
+
+	// Delete Seat Section
+	deleteSeatSection: adminProcedure
+		.input(
+			z.object({
+				id: z.string(),
+			}),
+		)
+		.mutation(async ({ input }) => {
+			try {
+				return await prisma.$transaction(async (tx) => {
+					const section = await tx.seatSections.delete({
+						where: {
+							id: input.id,
+						},
+					});
+
+					if (section) {
+						return {
+							success: true,
+							message: "Seat section deleted successfully",
+							section,
+						};
+					}
+				});
+			} catch (error) {
+				logger.error("Failed to delete seat section", error, {
+					operation: "deleteSeatSection",
+					sectionId: input.id,
+				});
+				return {
+					success: false,
+					message: "Failed to delete seat section",
 					error: error instanceof Error ? error.message : "Unknown error",
 				};
 			}

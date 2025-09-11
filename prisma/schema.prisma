@@ -173,24 +173,44 @@ model Seats {
   id        String   @id @default(uuid()) @db.Uuid
   venueId   String   @db.Uuid
   label     String   @db.VarChar(255)
-  section   String   @db.VarChar(50) // more flexible than single char
+  sectionId String   @db.Uuid
   row       Int
   number    Int
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
 
+  @@unique([venueId, sectionId, row, number])
+  @@index([venueId, sectionId, row, number])
+
   eventSeats EventSeats[]
   venue      Venues       @relation(fields: [venueId], references: [id])
+  section    SeatSections @relation(fields: [sectionId], references: [id])
+}
+
+model SeatSections {
+  id          String   @id @default(uuid()) @db.Uuid
+  venueId     String   @db.Uuid
+  name        String   @db.VarChar(255)
+  svgPathData String   @db.VarChar(1024)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  seats Seats[]
+  venue Venues  @relation(fields: [venueId], references: [id])
+
+  @@unique([venueId, name])
+  @@index([venueId, name])
 }
 
 model Venues {
   id          String   @id @default(uuid()) @db.Uuid
-  name        String   @unique @db.VarChar(255)
+  name        String   @unique @db.VarChar(10) // more flexible than single char
   description String   @db.VarChar(1020)
   location    String   @db.VarChar(255)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
 
-  events Events[]
-  seats  Seats[]
+  events   Events[]
+  seats    Seats[]
+  sections SeatSections[]
 }

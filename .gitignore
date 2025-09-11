@@ -10,3 +10,6 @@ __tests__/
 jest.config.js
 prisma/scripts/
 scripts/
+
+# IDEs
+.kiro

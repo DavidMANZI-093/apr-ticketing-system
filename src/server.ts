@@ -64,7 +64,20 @@ app.get(
 							isAvailable: true,
 							price: true,
 							category: true,
-							seat: { select: { label: true } },
+							seat: { 
+								select: {
+									label: true
+								},
+								include: {
+									section: {
+										select: {
+											id: true,
+											name: true,
+											svgPathData: true,
+										}
+									}
+								}
+							},
 						},
 					},
 					name: true,
@@ -95,6 +108,7 @@ app.get(
 						price: seat.price,
 						label: seat.seat.label,
 						category: seat.category,
+						section: seat.seat.section,
 					};
 					return acc;
 				},
@@ -317,6 +331,15 @@ const scheduleNextCronJob = async () => {
 										select: {
 											label: true,
 										},
+										include: {
+											section: {
+												select: {
+													id: true,
+													name: true,
+													svgPathData: true,
+												},
+											},
+										},
 									},
 								},
 							});
@@ -328,6 +351,7 @@ const scheduleNextCronJob = async () => {
 										price: seat.price,
 										label: seat.seat.label,
 										category: seat.category,
+										section: seat.seat.section,
 									};
 									return acc;
 								},

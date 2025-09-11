@@ -117,6 +117,15 @@ export const ticketRouter = t.router({
 									select: {
 										label: true,
 									},
+									include: {
+										section: {
+											select: {
+												id: true,
+												name: true,
+												svgPathData: true,
+											},
+										},
+									},
 								},
 							},
 						});
@@ -129,6 +138,7 @@ export const ticketRouter = t.router({
 										price: seat.price,
 										label: seat.seat.label,
 										category: seat.category,
+										section: seat.seat.section,
 									};
 									return acc;
 								},
@@ -256,6 +266,15 @@ export const ticketRouter = t.router({
 									select: {
 										label: true,
 									},
+									include: {
+										section: {
+											select: {
+												id: true,
+												name: true,
+												svgPathData: true,
+											},
+										},
+									},
 								},
 							},
 						});
@@ -268,6 +287,7 @@ export const ticketRouter = t.router({
 										price: seat.price,
 										label: seat.seat.label,
 										category: seat.category,
+										section: seat.seat.section,
 									};
 									return acc;
 								},
@@ -432,6 +452,15 @@ export const ticketRouter = t.router({
 									select: {
 										label: true,
 									},
+									include: {
+										section: {
+											select: {
+												id: true,
+												name: true,
+												svgPathData: true,
+											},
+										},
+									},
 								},
 							},
 						});
@@ -444,6 +473,7 @@ export const ticketRouter = t.router({
 										price: seat.price,
 										label: seat.seat.label,
 										category: seat.category,
+										section: seat.seat.section,
 									};
 									return acc;
 								},
@@ -606,6 +636,15 @@ export const ticketRouter = t.router({
 									select: {
 										label: true,
 									},
+									include: {
+										section: {
+											select: {
+												id: true,
+												name: true,
+												svgPathData: true,
+											},
+										},
+									},
 								},
 							},
 						});
@@ -618,6 +657,7 @@ export const ticketRouter = t.router({
 										price: seat.price,
 										label: seat.seat.label,
 										category: seat.category,
+										section: seat.seat.section,
 									};
 									return acc;
 								},
@@ -928,6 +968,15 @@ export const ticketRouter = t.router({
 									select: {
 										label: true,
 									},
+									include: {
+										section: {
+											select: {
+												id: true,
+												name: true,
+												svgPathData: true,
+											},
+										},
+									},
 								},
 							},
 						});
@@ -939,6 +988,7 @@ export const ticketRouter = t.router({
 									price: seat.price,
 									label: seat.seat.label,
 									category: seat.category,
+									section: seat.seat.section,
 								};
 								return acc;
 							},

@@ -115,6 +115,20 @@ export const eventRouter = t.router({
 					where: {
 						active: true,
 					},
+					include: {
+						venue: {
+							include: {
+								sections: {
+									select: {
+										id: true,
+										name: true,
+										svgPathData: true,
+									},
+								},
+							},
+						},
+						teams: true,
+					},
 				});
 				if (events) {
 					return {
@@ -156,6 +170,20 @@ export const eventRouter = t.router({
 						where: {
 							id: input.id,
 							active: true,
+						},
+						include: {
+							venue: {
+								include: {
+									sections: {
+										select: {
+											id: true,
+											name: true,
+											svgPathData: true,
+										},
+									},
+								},
+							},
+							teams: true,
 						},
 					});
 					if (event) {

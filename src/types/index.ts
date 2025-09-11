@@ -14,4 +14,9 @@ export interface Seat {
 	price: number | 0;
 	isAvailable: boolean;
 	category: string;
+	section: {
+		id: string;
+		name: string;
+		svgPathData: string;
+	};
 }
