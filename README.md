@@ -642,8 +642,8 @@ Headers: { Authorization: "Bearer <admin-token>" }
   "name": "Main Arena",
   "description": "Large concert venue",
   "location": {
-    "longitude": -1.9441,
-    "latitude": 30.0619
+    "longitude": 30.11562,
+    "latitude": -1.95318
   }
 }
 
@@ -655,7 +655,7 @@ Headers: { Authorization: "Bearer <admin-token>" }
     "id": "990e8400-e29b-41d4-a716-446655440004",
     "name": "Main Arena",
     "description": "Large concert venue",
-    "location": "-1.9441,30.0619",
+    "location": "30.11562,-1.95318",
     "createdAt": "2024-12-25T18:00:00.000Z",
     "updatedAt": "2024-12-25T18:00:00.000Z"
   }
@@ -677,7 +677,7 @@ Headers: { Authorization: "Bearer <dev-token>" }
       "id": "990e8400-e29b-41d4-a716-446655440004",
       "name": "Main Arena",
       "description": "Large concert venue",
-      "location": "-1.9441,30.0619",
+      "location": "30.11562,-1.95318",
       "createdAt": "2024-12-25T18:00:00.000Z",
       "updatedAt": "2024-12-25T18:00:00.000Z",
       "sections": [
@@ -726,8 +726,8 @@ Headers: { Authorization: "Bearer <admin-token>" }
   "name": "Updated Arena Name", // optional
   "description": "Updated venue description", // optional
   "location": { // optional
-    "longitude": -1.9500,
-    "latitude": 30.0700
+    "longitude": 30.11562,
+    "latitude": -1.95318
   }
 }
 ```
