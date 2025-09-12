@@ -3,6 +3,7 @@ import { createContext, t } from "./controllers/trpc";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { eventRouter } from "./routes/event-router";
 import { prisma } from "./controllers/prisma";
+
 import cron from "node-cron";
 import { OrderStatus, TicketState } from "../generated/prisma";
 import { ticketRouter } from "./routes/ticket-router";
@@ -20,6 +21,7 @@ import {
 	AuthenticatedSSERequest,
 } from "./middleware/sse-auth";
 import { Seat } from "./types";
+import cors from "cors";
 
 const appRouter = t.router({
 	event: eventRouter,
@@ -44,6 +46,10 @@ app.use(
 		createContext,
 	}),
 );
+
+app.use(cors({
+	origin: "*", // Allow all origins
+}));
 
 // SSE endpoint for live seat updates
 app.get(
