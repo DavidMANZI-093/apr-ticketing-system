@@ -49,7 +49,7 @@ app.use(
 
 app.use(cors({
 	origin: "*", // Allow all origins,
-	methods: ["GET", "POST"], // Explicitly allow methods used by tRPC
+	methods: ["GET", "POST", "OPTIONS"], // Explicitly allow methods used by tRPC
     allowedHeaders: ["Content-Type", "Authorization"],
 	credentials: true,
 }));
