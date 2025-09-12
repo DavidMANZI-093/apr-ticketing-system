@@ -131,7 +131,7 @@ export const seatRouter = t.router({
 		)
 		.mutation(async ({ input }) => {
 			// TODO: Remove loggs later
-			logger.info("Processing getEventSeats", {
+			logger.info("Processing getSeatsByVenue", {
 				eventId: input.venueId,
 			});
 			try {
