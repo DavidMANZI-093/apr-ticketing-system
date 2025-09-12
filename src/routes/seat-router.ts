@@ -235,6 +235,11 @@ export const seatRouter = t.router({
 		)
 		.mutation(async ({ input }) => {
 			try {
+				// TODO: Remove loggs later
+				logger.info("Processing getEventSeats", {
+					eventId: input.eventId,
+				});
+
 				return await prisma.$transaction(async (tx) => {
 					const eventSeats = await tx.eventSeats.findMany({
 						where: {
