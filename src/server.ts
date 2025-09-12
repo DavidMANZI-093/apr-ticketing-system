@@ -48,7 +48,8 @@ app.use(
 );
 
 app.use(cors({
-	origin: "*", // Allow all origins
+	origin: "*", // Allow all origins,
+	credentials: true,
 }));
 
 // SSE endpoint for live seat updates
