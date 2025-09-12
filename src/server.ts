@@ -66,9 +66,7 @@ app.get(
 							category: true,
 							seat: { 
 								select: {
-									label: true
-								},
-								include: {
+									label: true,
 									section: {
 										select: {
 											id: true,
@@ -76,7 +74,7 @@ app.get(
 											svgPathData: true,
 										}
 									}
-								}
+								},
 							},
 						},
 					},

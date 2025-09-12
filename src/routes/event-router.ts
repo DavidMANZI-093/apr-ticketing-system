@@ -171,17 +171,17 @@ export const eventRouter = t.router({
 							id: input.id,
 							active: true,
 						},
-						include: {
+						select: {
 							venue: {
-								include: {
+								select: {
 									sections: {
 										select: {
 											id: true,
 											name: true,
 											svgPathData: true,
-										},
+										}
 									},
-								},
+								}
 							},
 							teams: true,
 						},

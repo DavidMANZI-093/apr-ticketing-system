@@ -134,7 +134,7 @@ export const seatRouter = t.router({
 						where: {
 							venueId: input.venueId,
 						},
-						include: {
+						select: {
 							section: {
 								select: {
 									id: true,
