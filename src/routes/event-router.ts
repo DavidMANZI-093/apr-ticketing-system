@@ -172,6 +172,12 @@ export const eventRouter = t.router({
 							active: true,
 						},
 						select: {
+							id: true,
+							name: true,
+							description: true,
+							venueId: true,
+							startsAt: true,
+							active: true,
 							venue: {
 								select: {
 									sections: {
