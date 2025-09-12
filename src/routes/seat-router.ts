@@ -38,7 +38,9 @@ export const seatRouter = t.router({
 					}
 
 					// Verify all sections exist
-					const sectionIds = [...new Set(input.seats.map(seat => seat.sectionId))];
+					const sectionIds = [
+						...new Set(input.seats.map((seat) => seat.sectionId)),
+					];
 					const sections = await tx.seatSections.findMany({
 						where: {
 							id: { in: sectionIds },
@@ -56,7 +58,7 @@ export const seatRouter = t.router({
 
 					const seats = await tx.seats.createMany({
 						data: input.seats.map((seat) => {
-							const section = sections.find(s => s.id === seat.sectionId);
+							const section = sections.find((s) => s.id === seat.sectionId);
 							return {
 								venueId: input.venueId,
 								label: `${section?.name}${seat.row}-${seat.number}`,

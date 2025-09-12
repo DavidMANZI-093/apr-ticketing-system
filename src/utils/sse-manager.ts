@@ -58,32 +58,35 @@ class SSEManager {
 	// Start keepalive for a connection
 	private startKeepalive(connection: SSEConnection): void {
 		// Send keepalive every 25 minutes (before 30min timeout)
-		connection.keepaliveInterval = setInterval(() => {
-			try {
-				const keepaliveMessage = JSON.stringify({
-					type: "keepalive",
-					timestamp: Date.now(),
-				});
-				connection.res.write(`data: ${keepaliveMessage}\n\n`);
+		connection.keepaliveInterval = setInterval(
+			() => {
+				try {
+					const keepaliveMessage = JSON.stringify({
+						type: "keepalive",
+						timestamp: Date.now(),
+					});
+					connection.res.write(`data: ${keepaliveMessage}\n\n`);
 
-				logger.info("SSE keepalive sent", {
-					operation: "sseKeepalive",
-					eventId: connection.eventId,
-					userId: connection.userId,
-				});
-			} catch (error) {
-				// Connection is dead, cleanup will be handled by broadcast error detection
-				if (connection.keepaliveInterval) {
-					clearInterval(connection.keepaliveInterval);
+					logger.info("SSE keepalive sent", {
+						operation: "sseKeepalive",
+						eventId: connection.eventId,
+						userId: connection.userId,
+					});
+				} catch (error) {
+					// Connection is dead, cleanup will be handled by broadcast error detection
+					if (connection.keepaliveInterval) {
+						clearInterval(connection.keepaliveInterval);
+					}
+
+					logger.error("SSE keepalive failed", error, {
+						operation: "sseKeepaliveError",
+						eventId: connection.eventId,
+						userId: connection.userId,
+					});
 				}
-
-				logger.error("SSE keepalive failed", error, {
-					operation: "sseKeepaliveError",
-					eventId: connection.eventId,
-					userId: connection.userId,
-				});
-			}
-		}, 5 * 60 * 1000); // 5 minutes
+			},
+			5 * 60 * 1000,
+		); // 5 minutes
 	}
 
 	// Remove connection (internal)

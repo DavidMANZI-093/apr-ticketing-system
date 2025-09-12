@@ -179,9 +179,9 @@ export const eventRouter = t.router({
 											id: true,
 											name: true,
 											svgPathData: true,
-										}
+										},
 									},
-								}
+								},
 							},
 							teams: true,
 						},

@@ -321,7 +321,10 @@ export const venueRouter = t.router({
 
 					return {
 						success: true,
-						message: sections.length > 0 ? "Sections retrieved successfully" : "No sections found",
+						message:
+							sections.length > 0
+								? "Sections retrieved successfully"
+								: "No sections found",
 						sections,
 					};
 				});
@@ -356,7 +359,9 @@ export const venueRouter = t.router({
 						},
 						data: {
 							...(input.name !== undefined && { name: input.name }),
-							...(input.svgPathData !== undefined && { svgPathData: input.svgPathData }),
+							...(input.svgPathData !== undefined && {
+								svgPathData: input.svgPathData,
+							}),
 						},
 					});
 

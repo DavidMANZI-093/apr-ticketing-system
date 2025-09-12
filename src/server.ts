@@ -64,7 +64,7 @@ app.get(
 							isAvailable: true,
 							price: true,
 							category: true,
-							seat: { 
+							seat: {
 								select: {
 									label: true,
 									section: {
@@ -72,8 +72,8 @@ app.get(
 											id: true,
 											name: true,
 											svgPathData: true,
-										}
-									}
+										},
+									},
 								},
 							},
 						},
@@ -172,21 +172,21 @@ app.get("/sse/stats", authenticateSSE, (req: AuthenticatedSSERequest, res) => {
 	});
 });
 
-app.get('/health', async (req, res) => {
+app.get("/health", async (req, res) => {
 	try {
 		// Quick database ping
 		await prisma.$queryRaw`SELECT 1`;
 
 		res.status(200).json({
-			status: 'healthy',
+			status: "healthy",
 			timestamp: new Date().toISOString(),
 			uptime: process.uptime(),
 			memory: {
-				used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + 'MB',
-				total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024) + 'MB',
+				used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + "MB",
+				total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024) + "MB",
 			},
-			database: 'connected',
-			version: process.env.npm_package_version || 'unknown',
+			database: "connected",
+			version: process.env.npm_package_version || "unknown",
 		});
 
 		logger.info("Health check successful", {
@@ -194,25 +194,25 @@ app.get('/health', async (req, res) => {
 			timestamp: new Date().toISOString(),
 			uptime: process.uptime(),
 			memory: {
-				used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + 'MB',
-				total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024) + 'MB',
+				used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + "MB",
+				total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024) + "MB",
 			},
-			version: process.env.npm_package_version || 'unknown',
-		})
+			version: process.env.npm_package_version || "unknown",
+		});
 	} catch (error) {
 		res.status(503).json({
-			status: 'unhealthy',
+			status: "unhealthy",
 			timestamp: new Date().toISOString(),
-			error: 'Database connection failed'
+			error: "Database connection failed",
 		});
 
 		logger.error("Health check failed", {
 			operation: "healthCheck",
 			timestamp: new Date().toISOString(),
-			error: 'Database connection failed'
-		})
+			error: "Database connection failed",
+		});
 	}
-})
+});
 
 app.listen(3000, () => {
 	console.log("Server running on http://localhost:3000");
@@ -328,8 +328,6 @@ const scheduleNextCronJob = async () => {
 									seat: {
 										select: {
 											label: true,
-										},
-										include: {
 											section: {
 												select: {
 													id: true,
