@@ -141,6 +141,12 @@ export const seatRouter = t.router({
 							venueId: input.venueId,
 						},
 						select: {
+							id: true,
+							venueId: true,
+							label: true,
+							sectionId: true,
+							row: true,
+							number: true,
 							section: {
 								select: {
 									id: true,
