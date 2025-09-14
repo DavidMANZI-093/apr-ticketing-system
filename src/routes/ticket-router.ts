@@ -194,6 +194,12 @@ export const ticketRouter = t.router({
 					const uts = await tx.tickets.findMany({
 						where: {
 							userId: input.userId,
+							state: {
+								in: [TicketState.PENDING, TicketState.PAID],
+							},
+							event: {
+								active: true,
+							},
 						},
 					});
 
