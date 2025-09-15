@@ -98,10 +98,8 @@ export const ticketRouter = t.router({
 						// Update event seat to mark seat as unavailable
 						const eventSeat = await tx.eventSeats.update({
 							where: {
-								eventId_seatId: {
-									eventId: input.eventId,
-									seatId: input.seatId,
-								},
+								id: input.seatId,
+								eventId: input.eventId,
 							},
 							data: {
 								isAvailable: false,
