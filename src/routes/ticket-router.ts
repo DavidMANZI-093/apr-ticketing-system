@@ -110,12 +110,14 @@ export const ticketRouter = t.router({
 							where: {
 								eventId: input.eventId,
 							},
-							include: {
+							select: {
+								price: true,
+								category: true,
+								isAvailable: true,
+								seatId: true,
 								seat: {
 									select: {
 										label: true,
-									},
-									include: {
 										section: {
 											select: {
 												id: true,
