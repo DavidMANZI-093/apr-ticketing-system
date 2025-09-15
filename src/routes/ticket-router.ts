@@ -154,7 +154,7 @@ export const ticketRouter = t.router({
 							ticket,
 						};
 					}
-				});
+				}, { timeout: 30000 });
 			} catch (error) {
 				logger.error("Failed to create ticket", error, {
 					operation: "createTicket",
