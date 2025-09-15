@@ -57,6 +57,12 @@ export const venueRouter = t.router({
 			return await prisma.$transaction(async (tx) => {
 				const venues = await tx.venues.findMany({
 					select: {
+						id: true,
+						name: true,
+						location: true,
+						description: true,
+						createdAt: true,
+						updatedAt: true,
 						sections: {
 							select: {
 								id: true,
