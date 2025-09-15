@@ -59,8 +59,8 @@ export const venueRouter = t.router({
 					select: {
 						id: true,
 						name: true,
-						location: true,
 						description: true,
+						location: true,
 						createdAt: true,
 						updatedAt: true,
 						sections: {
