@@ -966,10 +966,20 @@ Headers: { Authorization: "Bearer <dev-token>" }
       "id": "event-seat-uuid",
       "eventId": "event-uuid",
       "seatId": "seat-uuid",
-      "price": 50.00,
       "category": "VIP",
+      "price": 50.00,
       "isAvailable": true,
-      "available": true
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z",
+      "seat": {
+        "label": "A1-1",
+        "row": 1,
+        "number": 1,
+        "section": {
+          "id": "section-uuid",
+          "name": "A",
+        }
+      }
     }
   ]
 }

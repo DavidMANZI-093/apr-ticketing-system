@@ -255,6 +255,30 @@ export const seatRouter = t.router({
 						where: {
 							eventId: input.eventId,
 						},
+						select: {
+							id: true,
+							eventId: true,
+							seatId: true,
+							category: true,
+							price: true,
+							isAvailable: true,
+							createdAt: true,
+							updatedAt: true,
+							seat: {
+								select: {
+									label: true,
+									row: true,
+									number: true,
+									section: {
+										select: {
+											id: true,
+											name: true,
+											svgPathData: true,
+										},
+									},
+								},
+							},
+						},
 					});
 
 					if (eventSeats) {
