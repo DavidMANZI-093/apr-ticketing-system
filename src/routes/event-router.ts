@@ -180,6 +180,8 @@ export const eventRouter = t.router({
 							active: true,
 							venue: {
 								select: {
+									id: true,
+									name: true,
 									sections: {
 										select: {
 											id: true,
