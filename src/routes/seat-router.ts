@@ -293,7 +293,7 @@ export const seatRouter = t.router({
 							eventSeats: [],
 						};
 					}
-				}, { timeout: 10000 });
+				}, { timeout: 30000 });
 			} catch (error) {
 				logger.error("Failed to retrieve event seats", error, {
 					operation: "getEventSeats",
