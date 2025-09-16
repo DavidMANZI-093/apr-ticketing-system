@@ -305,7 +305,7 @@ export const seatRouter = t.router({
 					error: error instanceof Error ? error.message : "Unknown error",
 				};
 			}
-		}),
+		}, { timeout: 8000 }), // 8 seconds transaction timeout
 
 	// Get Event Seat
 	getEventSeat: devProcedure
