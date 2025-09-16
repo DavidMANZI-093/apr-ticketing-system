@@ -47,12 +47,14 @@ app.use(
 	}),
 );
 
-app.use(cors({
-	origin: "*", // Allow all origins,
-	methods: ["GET", "POST", "OPTIONS"], // Explicitly allow methods used by tRPC
-    allowedHeaders: ["Content-Type", "Authorization"],
-	credentials: true,
-}));
+app.use(
+	cors({
+		origin: "*", // Allow all origins,
+		methods: ["GET", "POST", "OPTIONS"], // Explicitly allow methods used by tRPC
+		allowedHeaders: ["Content-Type", "Authorization"],
+		credentials: true,
+	}),
+);
 
 // SSE endpoint for live seat updates
 app.get(

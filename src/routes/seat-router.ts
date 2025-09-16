@@ -273,7 +273,6 @@ export const seatRouter = t.router({
 										select: {
 											id: true,
 											name: true,
-											svgPathData: true,
 										},
 									},
 								},
