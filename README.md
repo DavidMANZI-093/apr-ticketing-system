@@ -1608,10 +1608,34 @@ Headers: { Authorization: "Bearer <dev-token>" }
   ]
 }
 
-// Success Response:
+// Success Response (Payment Success - 70% probability):
 {
   "success": true,
-  "message": "Payment order placed successfully",
+  "message": "Order placed and tickets paid successfully",
+  "order": {
+    "id": "660e8400-e29b-41d4-a716-44665544001e",
+    "userId": "110e8400-e29b-41d4-a716-44665544000b",
+    "status": "PAID",
+    "total": null,
+    "createdAt": "2024-12-25T19:00:00.000Z",
+    "updatedAt": "2024-12-25T19:00:00.000Z",
+    "tickets": [
+      {
+        "id": "330e8400-e29b-41d4-a716-44665544000d",
+        "state": "PAID"
+      },
+      {
+        "id": "550e8400-e29b-41d4-a716-44665544000f", 
+        "state": "PAID"
+      }
+    ]
+  }
+}
+
+// Insufficient Funds Response (30% probability):
+{
+  "success": true,
+  "message": "Insufficient funds",
   "order": {
     "id": "660e8400-e29b-41d4-a716-44665544001e",
     "userId": "110e8400-e29b-41d4-a716-44665544000b",
@@ -1622,8 +1646,10 @@ Headers: { Authorization: "Bearer <dev-token>" }
   }
 }
 
-// Creates order record for payment processing
-// Note: Actual payment processing integration needs to be implemented
+// Mock Payment Simulation:
+// - 70% success rate: tickets automatically marked as PAID, order status updated
+// - 30% insufficient funds: order remains PENDING, tickets stay PENDING
+// - Links tickets to order via connect relationship
 ```
 
 #### Cancel Ticket (Admin only)
@@ -1675,6 +1701,7 @@ QR codes are cryptographically signed with HMAC-SHA256 for security. They contai
 #### Generate QR Code
 ```typescript
 // tRPC Mutation - Requires Dev Authentication
+// Note: Only works for PAID tickets
 ticket.getTicketQRCode
 Headers: { Authorization: "Bearer <dev-token>" }
 {
@@ -1698,8 +1725,16 @@ Headers: { Authorization: "Bearer <dev-token>" }
   }
 }
 
+// Error Response (Ticket not found or not PAID):
+{
+  "success": false,
+  "message": "Failed to retrieve ticket QR code",
+  "error": "Ticket not found"
+}
+
 // QR code contains HMAC-signed payload with ticket ID, event ID, seat ID, and timestamp
 // Base64 PNG format for easy integration
+// Only generates QR codes for tickets in PAID state
 ```
 
 ### Validate QR Code
@@ -1735,15 +1770,106 @@ Headers: { Authorization: "Bearer <admin-token>" }
 
 ## User Management
 
-### Get User by Email
+### Create User
 ```typescript
-POST /trpc/user.getUser
+// tRPC Mutation - Requires Dev Authentication
+user.createUser
 Headers: { Authorization: "Bearer <dev-token>" }
 {
-  "email": "user@example.com"
+  "username": "john_doe",
+  "name": "John Doe",
+  "email": "john@example.com",
+  "phone": "+250788123456"
 }
 
-// Returns user record or null if not found
+// Success Response:
+{
+  "success": true,
+  "message": "User created successfully",
+  "user": {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "username": "john_doe",
+    "name": "John Doe",
+    "email": "john@example.com",
+    "phone": "+250788123456",
+    "createdAt": "2024-12-25T19:00:00.000Z",
+    "updatedAt": "2024-12-25T19:00:00.000Z"
+  }
+}
+
+// Note: Phone number must be valid Rwanda format
+```
+
+### Get User (Multi-lookup)
+```typescript
+// tRPC Mutation - Requires Dev Authentication (Recommended for mock sign-in)
+user.getUser
+Headers: { Authorization: "Bearer <dev-token>" }
+{
+  "usernameOrEmailOrPhone": {
+    "type": "email", // "username" | "email" | "phone"
+    "value": "john@example.com"
+  }
+}
+
+// Success Response:
+{
+  "success": true,
+  "message": "User retrieved successfully",
+  "user": {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "username": "john_doe",
+    "name": "John Doe",
+    "email": "john@example.com",
+    "phone": "+250788123456",
+    "createdAt": "2024-12-25T19:00:00.000Z",
+    "updatedAt": "2024-12-25T19:00:00.000Z"
+  }
+}
+
+// User Not Found Response:
+{
+  "success": true,
+  "message": "User not found",
+  "user": null
+}
+
+// Examples:
+// Username lookup: { "type": "username", "value": "john_doe" }
+// Email lookup: { "type": "email", "value": "john@example.com" }
+// Phone lookup: { "type": "phone", "value": "+250788123456" }
+```
+
+### Get User by ID
+```typescript
+// tRPC Mutation - Requires Dev Authentication
+user.getUserById
+Headers: { Authorization: "Bearer <dev-token>" }
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000"
+}
+
+// Success Response:
+{
+  "success": true,
+  "message": "User retrieved successfully",
+  "user": {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "username": "john_doe",
+    "name": "John Doe",
+    "email": "john@example.com",
+    "phone": "+250788123456",
+    "createdAt": "2024-12-25T19:00:00.000Z",
+    "updatedAt": "2024-12-25T19:00:00.000Z"
+  }
+}
+
+// User Not Found Response:
+{
+  "success": true,
+  "message": "User not found",
+  "user": null
+}
 ```
 
 ## Team Management

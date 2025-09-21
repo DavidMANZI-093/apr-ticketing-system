@@ -1,7 +1,7 @@
 import { t } from "../controllers/trpc";
 import { z } from "zod";
 import { prisma } from "../controllers/prisma";
-import { TicketState, TicketType, Tickets } from "../../generated/prisma";
+import { OrderStatus, TicketState, TicketType, Tickets } from "../../generated/prisma";
 import { logger } from "../utils/logger";
 import { devProcedure } from "../middleware/dev-procedure";
 import { generateSecureQRData } from "../utils/qr-code";
@@ -875,7 +875,7 @@ export const ticketRouter = t.router({
 			}
 		}),
 
-	// Get user's tickets ()
+	// Get user's tickets
 	getUserTickets: devProcedure
 		.input(
 			z.object({
@@ -1064,15 +1064,50 @@ export const ticketRouter = t.router({
 						const order = await tx.orders.create({
 							data: {
 								userId: input.userId,
+								tickets: {
+									connect: tickets.map((ticket) => ({ id: ticket.id })),
+								},
 							},
 						});
 
-						if (order) {
-							return {
-								success: true,
-								message: "Payment order placed successfully",
-								order,
-							};
+						if (order) { // Mock payment procedure
+							const state: "SUCCESS" | "INSUFFICIENT" = Math.random() > 0.7 ? "SUCCESS" : "INSUFFICIENT"; // 70% success rate
+							
+							switch (state) {
+								case "SUCCESS":
+									await tx.tickets.updateMany({
+										data: {
+											state: TicketState.PAID
+										}, where: {
+											id: {
+												in: tickets.map((ticket) => ticket.id),
+											}
+										}
+									});
+		
+									await tx.orders.update({
+										where: {
+											id: order.id,
+										},
+										data: {
+											status: OrderStatus.PAID,
+										}
+									});
+		
+									return {
+										success: true,
+										message: "Order placed and tickets paid successfully",
+										order,
+									}
+								case "INSUFFICIENT":
+									return {
+										success: true,
+										message: "Insufficient funds",
+										order,
+									}
+								default:
+									throw new Error("Unknown error");
+							}
 						}
 					} else {
 						return {
@@ -1108,32 +1143,35 @@ export const ticketRouter = t.router({
 					const ticket = await tx.tickets.findUnique({
 						where: {
 							id: input.ticketId,
+							state: TicketState.PAID,
 						},
 					});
 
-					if (ticket) {
-						const qrData = generateSecureQRData(ticket);
-						const qrBuffer = await QRCode.toBuffer(qrData, {
-							width: 256,
-							margin: 2,
-							errorCorrectionLevel: "M",
-						});
-						return {
-							success: true,
-							message: "Ticket QR code retrieved successfully",
-							qrCode: `data:image/png;base64,${qrBuffer.toString("base64")}`,
-							ticketInfo: {
-								event: await tx.events
-									.findUnique({ where: { id: ticket.eventId } })
-									.then((event) => event?.name),
-								seat: ticket.seatId,
-								date: await tx.events
-									.findUnique({ where: { id: ticket.eventId } })
-									.then((event) => event?.startsAt),
-								client: ticket.bearer,
-							},
-						};
+					if (!ticket) {
+						throw new Error("Ticket not found");
 					}
+
+					const qrData = generateSecureQRData(ticket);
+					const qrBuffer = await QRCode.toBuffer(qrData, {
+						width: 256,
+						margin: 2,
+						errorCorrectionLevel: "M",
+					});
+					return {
+						success: true,
+						message: "Ticket QR code retrieved successfully",
+						qrCode: `data:image/png;base64,${qrBuffer.toString("base64")}`,
+						ticketInfo: {
+							event: await tx.events
+								.findUnique({ where: { id: ticket.eventId } })
+								.then((event) => event?.name),
+							seat: ticket.seatId,
+							date: await tx.events
+								.findUnique({ where: { id: ticket.eventId } })
+								.then((event) => event?.startsAt),
+							client: ticket.bearer,
+						},
+					};
 				});
 			} catch (error) {
 				logger.error("Failed to retrieve ticket QR code", error, {
@@ -1191,6 +1229,10 @@ export const ticketRouter = t.router({
 							seat: true,
 						},
 					});
+
+					if (!ticket) {
+						throw new Error("Ticket not found");
+					}
 
 					const seat = await tx.seats.findUnique({
 						where: {
