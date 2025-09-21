@@ -14,7 +14,6 @@ A comprehensive event ticketing system built with TypeScript, tRPC, and Prisma. 
 - **Payment**: External payment gateway integration
 - **QR Codes**: QR code generation with qrcode library
 - **Validation**: Zod for input validation and schema enforcement
-<!-- - **Phone Numbers**: libphonenumber-js for phone number validation -->
 <!-- - **Testing**: Jest with TypeScript support -->
 
 ### Project Structure

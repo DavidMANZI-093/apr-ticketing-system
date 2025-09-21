@@ -3,7 +3,6 @@ import { z } from "zod";
 import { prisma } from "../controllers/prisma";
 import { devProcedure } from "../middleware/dev-procedure";
 import { logger } from "../utils/logger";
-import { isValidNumber } from "libphonenumber-js";
 import { Users } from "../../generated/prisma";
 
 export const userRouter = t.router({
@@ -14,7 +13,7 @@ export const userRouter = t.router({
 				username: z.string(),
 				name: z.string(),
 				email: z.email(),
-				phone: z.string().refine((value) => isValidNumber(value, "RW"), "Invalid phone number"),
+				phone: z.string().regex(/^\+2507[2389]\d{7}$/, "Invalid phone number"),
 			})
 		).mutation(async ({ input }) => {
 			try {
@@ -64,7 +63,7 @@ export const userRouter = t.router({
 				}).refine((data) => {
 					switch (data.type) {
 						case "phone":
-							return isValidNumber(data.value, "RW");
+							return z.string().regex(/^\+2507[2389]\d{7}$/).safeParse(data.value).success;
 						case "email":
 							return z.email().safeParse(data.value).success;
 						case "username":

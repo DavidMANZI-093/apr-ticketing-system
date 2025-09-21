@@ -48,7 +48,6 @@
 		"cors": "^2.8.5",
 		"express": "^5.1.0",
 		"jsonwebtoken": "^9.0.2",
-		"libphonenumber-js": "^1.12.12",
 		"node-cron": "^4.2.1",
 		"nodemailer": "^7.0.5",
 		"qrcode": "^1.5.4",
