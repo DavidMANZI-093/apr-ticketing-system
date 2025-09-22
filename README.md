@@ -1607,7 +1607,7 @@ Headers: { Authorization: "Bearer <dev-token>" }
   ]
 }
 
-// Success Response (Payment Success - 70% probability):
+// Success Response (Payment Success - 90% probability):
 {
   "success": true,
   "message": "Order placed and tickets paid successfully",
@@ -1631,7 +1631,7 @@ Headers: { Authorization: "Bearer <dev-token>" }
   }
 }
 
-// Insufficient Funds Response (30% probability):
+// Insufficient Funds Response (10% probability):
 {
   "success": true,
   "message": "Insufficient funds",
@@ -1646,8 +1646,8 @@ Headers: { Authorization: "Bearer <dev-token>" }
 }
 
 // Mock Payment Simulation:
-// - 70% success rate: tickets automatically marked as PAID, order status updated
-// - 30% insufficient funds: order remains PENDING, tickets stay PENDING
+// - 90% success rate: tickets automatically marked as PAID, order status updated
+// - 10% insufficient funds: order remains PENDING, tickets stay PENDING
 // - Links tickets to order via connect relationship
 ```
 

@@ -1071,7 +1071,7 @@ export const ticketRouter = t.router({
 						});
 
 						if (order) { // Mock payment procedure
-							const state: "SUCCESS" | "INSUFFICIENT" = Math.random() > 0.7 ? "SUCCESS" : "INSUFFICIENT"; // 70% success rate
+							const state: "SUCCESS" | "INSUFFICIENT" = Math.random() <= 0.9 ? "SUCCESS" : "INSUFFICIENT"; // 90% success rate
 							
 							switch (state) {
 								case "SUCCESS":
