@@ -273,12 +273,16 @@ export const ticketRouter = t.router({
 							where: {
 								eventId: input.eventId,
 							},
-							include: {
+							select: {
+								id: true,
+								seatId: true,
+								eventId: true,
+								category: true,
+								price: true,
+								isAvailable: true,
 								seat: {
 									select: {
 										label: true,
-									},
-									include: {
 										section: {
 											select: {
 												id: true,
@@ -441,28 +445,34 @@ export const ticketRouter = t.router({
 
 					if (tickets.length === input.group.length) {
 						// Update event seats to mark seats as unavailable
-						for (const ticket of tickets) {
-							await tx.eventSeats.update({
-								where: {
-									id: ticket.seatId,
-									eventId: input.eventId,
-								},
-								data: {
-									isAvailable: false,
-								},
-							});
-						}
+						await Promise.all(
+							tickets.map((ticket) =>
+								tx.eventSeats.update({
+									where: {
+										id: ticket.seatId,
+										eventId: input.eventId,
+									},
+									data: {
+										isAvailable: false,
+									},
+								}),
+							),
+						);
 
 						const eventSeats = await tx.eventSeats.findMany({
 							where: {
 								eventId: input.eventId,
 							},
-							include: {
+							select: {
+								id: true,
+								seatId: true,
+								eventId: true,
+								category: true,
+								price: true,
+								isAvailable: true,
 								seat: {
 									select: {
 										label: true,
-									},
-									include: {
 										section: {
 											select: {
 												id: true,
@@ -623,28 +633,34 @@ export const ticketRouter = t.router({
 
 					if (tickets.length === family.length) {
 						// Update event seats to mark seats as unavailable
-						for (const ticket of tickets) {
-							await tx.eventSeats.update({
-								where: {
-									id: ticket.seatId,
-									eventId: input.eventId,
-								},
-								data: {
-									isAvailable: false,
-								},
-							});
-						}
+						await Promise.all(
+							tickets.map((ticket) =>
+								tx.eventSeats.update({
+									where: {
+										id: ticket.seatId,
+										eventId: input.eventId,
+									},
+									data: {
+										isAvailable: false,
+									},
+								}),
+							),
+						);
 
 						const eventSeats = await tx.eventSeats.findMany({
 							where: {
 								eventId: input.eventId,
 							},
-							include: {
+							select: {
+								id: true,
+								seatId: true,
+								eventId: true,
+								category: true,
+								price: true,
+								isAvailable: true,
 								seat: {
 									select: {
 										label: true,
-									},
-									include: {
 										section: {
 											select: {
 												id: true,
