@@ -54,10 +54,14 @@ export const ticketRouter = t.router({
 						const uts = await tx.tickets.findMany({
 							where: {
 								userId: input.userId,
+								state: {
+									in: [TicketState.PENDING, TicketState.PAID],
+								},
+								eventId: input.eventId,
 							},
 						});
 
-						if (uts.length >= 14) {
+						if (uts.length + 1 > 14) {
 							// user has reached the limit of 14 tickets - throw error
 							throw new Error("User has reached the limit of 14 tickets");
 						}
@@ -205,13 +209,11 @@ export const ticketRouter = t.router({
 							state: {
 								in: [TicketState.PENDING, TicketState.PAID],
 							},
-							event: {
-								active: true,
-							},
+							eventId: input.eventId,
 						},
 					});
 
-					if (uts.length >= 14) {
+					if (uts.length + 1 > 14) {
 						// user has reached the limit of 14 tickets - throw error
 						throw new Error("User has reached the limit of 14 tickets");
 					}
@@ -380,12 +382,16 @@ export const ticketRouter = t.router({
 					const uts = await tx.tickets.findMany({
 						where: {
 							userId: input.userId,
+							state: {
+								in: [TicketState.PENDING, TicketState.PAID],
+							},
+							eventId: input.eventId,
 						},
 					});
 
-					if (uts.length >= 14) {
+					if (uts.length + input.group.length > 14) {
 						// user has reached the limit of 14 tickets - throw error
-						throw new Error("User has reached the limit of 14 tickets");
+						throw new Error(`Group size exceeds the limit of 14 tickets. Only ${14 - uts.length} tickets left.`);
 					}
 
 					let tickets: Tickets[] = [];
@@ -568,12 +574,16 @@ export const ticketRouter = t.router({
 					const uts = await tx.tickets.findMany({
 						where: {
 							userId: input.userId,
+							state: {
+								in: [TicketState.PENDING, TicketState.PAID],
+							},
+							eventId: input.eventId,
 						},
 					});
 
-					if (uts.length >= 14) {
+					if (uts.length + input.family.length > 14) {
 						// user has reached the limit of 14 tickets - throw error
-						throw new Error("User has reached the limit of 14 tickets");
+						throw new Error(`Family size exceeds the limit of 14 tickets. Only ${14 - uts.length} tickets left.`);
 					}
 
 					let tickets: Tickets[] = [];
