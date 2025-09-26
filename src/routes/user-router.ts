@@ -14,8 +14,9 @@ export const userRouter = t.router({
 				name: z.string(),
 				email: z.email(),
 				phone: z.string().regex(/^\+2507[2389]\d{7}$/, "Invalid phone number"),
-			})
-		).mutation(async ({ input }) => {
+			}),
+		)
+		.mutation(async ({ input }) => {
 			try {
 				return await prisma.$transaction(async (tx) => {
 					const user = await tx.users.create({
@@ -57,21 +58,26 @@ export const userRouter = t.router({
 	getUser: devProcedure // Recommended for mock sign-in
 		.input(
 			z.object({
-				usernameOrEmailOrPhone: z.object({
-					type: z.enum(["username", "email", "phone"]),
-					value: z.string(),
-				}).refine((data) => {
-					switch (data.type) {
-						case "phone":
-							return z.string().regex(/^\+2507[2389]\d{7}$/).safeParse(data.value).success;
-						case "email":
-							return z.email().safeParse(data.value).success;
-						case "username":
-							return z.string().safeParse(data.value).success;
-						default:
-							return true;
-					}
-				}),
+				usernameOrEmailOrPhone: z
+					.object({
+						type: z.enum(["username", "email", "phone"]),
+						value: z.string(),
+					})
+					.refine((data) => {
+						switch (data.type) {
+							case "phone":
+								return z
+									.string()
+									.regex(/^\+2507[2389]\d{7}$/)
+									.safeParse(data.value).success;
+							case "email":
+								return z.email().safeParse(data.value).success;
+							case "username":
+								return z.string().safeParse(data.value).success;
+							default:
+								return true;
+						}
+					}),
 			}),
 		)
 		.mutation(async ({ input }) => {
@@ -125,44 +131,44 @@ export const userRouter = t.router({
 			}
 		}),
 
-		// Get User By ID
-		getUserById: devProcedure
-			.input(
-				z.object({
-					id: z.string(),
-				})
-			)
-			.mutation(async ({ input }) => {
-				try {
-					return await prisma.$transaction(async (tx) => {
-						const user = await tx.users.findUnique({
-							where: { id: input.id },
-						});
-
-						if (user) {
-							return {
-								success: true,
-								message: "User retrieved successfully",
-								user,
-							};
-						} else {
-							return {
-								success: true,
-								message: "User not found",
-								user: null,
-							};
-						}
-					})
-				} catch (error) {
-					logger.error("Failed to retrieve user", error, {
-						operation: "getUserById",
-						id: input.id,
+	// Get User By ID
+	getUserById: devProcedure
+		.input(
+			z.object({
+				id: z.string(),
+			}),
+		)
+		.mutation(async ({ input }) => {
+			try {
+				return await prisma.$transaction(async (tx) => {
+					const user = await tx.users.findUnique({
+						where: { id: input.id },
 					});
-					return {
-						success: false,
-						message: "Failed to retrieve user",
-						error: error instanceof Error ? error.message : "Unknown error",
-					};
-				}
-			})
+
+					if (user) {
+						return {
+							success: true,
+							message: "User retrieved successfully",
+							user,
+						};
+					} else {
+						return {
+							success: true,
+							message: "User not found",
+							user: null,
+						};
+					}
+				});
+			} catch (error) {
+				logger.error("Failed to retrieve user", error, {
+					operation: "getUserById",
+					id: input.id,
+				});
+				return {
+					success: false,
+					message: "Failed to retrieve user",
+					error: error instanceof Error ? error.message : "Unknown error",
+				};
+			}
+		}),
 });

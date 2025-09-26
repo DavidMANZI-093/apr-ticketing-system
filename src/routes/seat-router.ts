@@ -250,50 +250,53 @@ export const seatRouter = t.router({
 					eventId: input.eventId,
 				});
 
-				return await prisma.$transaction(async (tx) => {
-					const eventSeats = await tx.eventSeats.findMany({
-						where: {
-							eventId: input.eventId,
-						},
-						select: {
-							id: true,
-							eventId: true,
-							seatId: true,
-							category: true,
-							price: true,
-							isAvailable: true,
-							createdAt: true,
-							updatedAt: true,
-							seat: {
-								select: {
-									label: true,
-									row: true,
-									number: true,
-									section: {
-										select: {
-											id: true,
-											name: true,
+				return await prisma.$transaction(
+					async (tx) => {
+						const eventSeats = await tx.eventSeats.findMany({
+							where: {
+								eventId: input.eventId,
+							},
+							select: {
+								id: true,
+								eventId: true,
+								seatId: true,
+								category: true,
+								price: true,
+								isAvailable: true,
+								createdAt: true,
+								updatedAt: true,
+								seat: {
+									select: {
+										label: true,
+										row: true,
+										number: true,
+										section: {
+											select: {
+												id: true,
+												name: true,
+											},
 										},
 									},
 								},
 							},
-						},
-					});
+						});
 
-					if (eventSeats) {
-						return {
-							success: true,
-							message: "Event seats retrieved successfully",
-							eventSeats,
-						};
-					} else {
-						return {
-							success: true,
-							message: "No event seats found",
-							eventSeats: [],
-						};
-					}
-				}, { timeout: 30000 });
+						if (eventSeats) {
+							return {
+								success: true,
+								message: "Event seats retrieved successfully",
+								eventSeats,
+							};
+						} else {
+							return {
+								success: true,
+								message: "No event seats found",
+								eventSeats: [],
+							};
+						}
+					},
+					{ timeout: 30000 },
+				);
 			} catch (error) {
 				logger.error("Failed to retrieve event seats", error, {
 					operation: "getEventSeats",

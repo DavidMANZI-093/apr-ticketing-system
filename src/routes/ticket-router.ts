@@ -1,7 +1,12 @@
 import { t } from "../controllers/trpc";
 import { z } from "zod";
 import { prisma } from "../controllers/prisma";
-import { OrderStatus, TicketState, TicketType, Tickets } from "../../generated/prisma";
+import {
+	OrderStatus,
+	TicketState,
+	TicketType,
+	Tickets,
+} from "../../generated/prisma";
 import { logger } from "../utils/logger";
 import { devProcedure } from "../middleware/dev-procedure";
 import { generateSecureQRData } from "../utils/qr-code";
@@ -256,10 +261,8 @@ export const ticketRouter = t.router({
 						// Update event seat to mark seat as unavailable
 						const eventSeat = await tx.eventSeats.update({
 							where: {
-								eventId_seatId: {
-									eventId: input.eventId,
-									seatId: input.seatId,
-								},
+								id: input.seatId,
+								eventId: input.eventId,
 							},
 							data: {
 								isAvailable: false,
@@ -441,10 +444,8 @@ export const ticketRouter = t.router({
 						for (const ticket of tickets) {
 							await tx.eventSeats.update({
 								where: {
-									eventId_seatId: {
-										eventId: input.eventId,
-										seatId: ticket.seatId,
-									},
+									id: ticket.seatId,
+									eventId: input.eventId,
 								},
 								data: {
 									isAvailable: false,
@@ -625,10 +626,8 @@ export const ticketRouter = t.router({
 						for (const ticket of tickets) {
 							await tx.eventSeats.update({
 								where: {
-									eventId_seatId: {
-										eventId: input.eventId,
-										seatId: ticket.seatId,
-									},
+									id: ticket.seatId,
+									eventId: input.eventId,
 								},
 								data: {
 									isAvailable: false,
@@ -1070,41 +1069,44 @@ export const ticketRouter = t.router({
 							},
 						});
 
-						if (order) { // Mock payment procedure
-							const state: "SUCCESS" | "INSUFFICIENT" = Math.random() <= 0.9 ? "SUCCESS" : "INSUFFICIENT"; // 90% success rate
-							
+						if (order) {
+							// Mock payment procedure
+							const state: "SUCCESS" | "INSUFFICIENT" =
+								Math.random() <= 0.9 ? "SUCCESS" : "INSUFFICIENT"; // 90% success rate
+
 							switch (state) {
 								case "SUCCESS":
 									await tx.tickets.updateMany({
 										data: {
-											state: TicketState.PAID
-										}, where: {
+											state: TicketState.PAID,
+										},
+										where: {
 											id: {
 												in: tickets.map((ticket) => ticket.id),
-											}
-										}
+											},
+										},
 									});
-		
+
 									await tx.orders.update({
 										where: {
 											id: order.id,
 										},
 										data: {
 											status: OrderStatus.PAID,
-										}
+										},
 									});
-		
+
 									return {
 										success: true,
 										message: "Order placed and tickets paid successfully",
 										order,
-									}
+									};
 								case "INSUFFICIENT":
 									return {
 										success: true,
 										message: "Insufficient funds",
 										order,
-									}
+									};
 								default:
 									throw new Error("Unknown error");
 							}
