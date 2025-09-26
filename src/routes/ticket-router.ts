@@ -321,7 +321,7 @@ export const ticketRouter = t.router({
 							ticket,
 						};
 					}
-				});
+				}, { timeout: 30000 });
 			} catch (error) {
 				logger.error("Failed to create ticket", error, {
 					operation: "createGiftTicket",
@@ -511,7 +511,7 @@ export const ticketRouter = t.router({
 							tickets,
 						};
 					}
-				});
+				}, { timeout: 30000 });
 			} catch (error) {
 				logger.error("Failed to create ticket", error, {
 					operation: "createGroupTicket",
@@ -699,7 +699,7 @@ export const ticketRouter = t.router({
 							tickets,
 						};
 					}
-				});
+				}, { timeout: 30000 });
 			} catch (error) {
 				logger.error("Failed to create ticket", error, {
 					operation: "createFamilyTicket",
