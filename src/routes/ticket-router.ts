@@ -196,134 +196,137 @@ export const ticketRouter = t.router({
 		)
 		.mutation(async ({ input }) => {
 			try {
-				return await prisma.$transaction(async (tx) => {
-					const user = await tx.users.findUnique({
-						where: {
-							email: input.bearer,
-						},
-					});
-
-					const uts = await tx.tickets.findMany({
-						where: {
-							userId: input.userId,
-							state: {
-								in: [TicketState.PENDING, TicketState.PAID],
-							},
-							eventId: input.eventId,
-						},
-					});
-
-					if (uts.length + 1 > 14) {
-						// user has reached the limit of 14 tickets - throw error
-						throw new Error("User has reached the limit of 14 tickets");
-					}
-
-					const et = await tx.tickets.findUnique({
-						where: {
-							seatId_eventId: {
-								seatId: input.seatId,
-								eventId: input.eventId,
-							},
-						},
-					});
-
-					if (et && et.state !== TicketState.CANCELLED) {
-						// exists and not cancelled - throw error
-						throw new Error("Seat is already booked");
-					}
-
-					if (et && et.state === TicketState.CANCELLED) {
-						// exists and cancelled - delete and continue
-						await tx.tickets.delete({ where: { id: et.id } });
-					}
-
-					if (!user) {
-						// user not found - throw error
-						throw new Error("Gifted user not found");
-					}
-
-					const ticket = await tx.tickets.create({
-						data: {
-							eventId: input.eventId,
-							teamId: input.teamId,
-							userId: input.userId,
-							seatId: input.seatId,
-							type: TicketType.GIFT,
-							expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes from now
-							state: TicketState.PENDING,
-							bearer: {
-								name: user.name,
-								email: user.email,
-								phone: user.phone,
-							},
-						},
-					});
-
-					if (ticket) {
-						// Update event seat to mark seat as unavailable
-						const eventSeat = await tx.eventSeats.update({
+				return await prisma.$transaction(
+					async (tx) => {
+						const user = await tx.users.findUnique({
 							where: {
-								id: input.seatId,
-								eventId: input.eventId,
-							},
-							data: {
-								isAvailable: false,
+								email: input.bearer,
 							},
 						});
 
-						const eventSeats = await tx.eventSeats.findMany({
+						const uts = await tx.tickets.findMany({
 							where: {
+								userId: input.userId,
+								state: {
+									in: [TicketState.PENDING, TicketState.PAID],
+								},
 								eventId: input.eventId,
 							},
-							select: {
-								id: true,
-								seatId: true,
-								eventId: true,
-								category: true,
-								price: true,
-								isAvailable: true,
-								seat: {
-									select: {
-										label: true,
-										section: {
-											select: {
-												id: true,
-												name: true,
-												svgPathData: true,
+						});
+
+						if (uts.length + 1 > 14) {
+							// user has reached the limit of 14 tickets - throw error
+							throw new Error("User has reached the limit of 14 tickets");
+						}
+
+						const et = await tx.tickets.findUnique({
+							where: {
+								seatId_eventId: {
+									seatId: input.seatId,
+									eventId: input.eventId,
+								},
+							},
+						});
+
+						if (et && et.state !== TicketState.CANCELLED) {
+							// exists and not cancelled - throw error
+							throw new Error("Seat is already booked");
+						}
+
+						if (et && et.state === TicketState.CANCELLED) {
+							// exists and cancelled - delete and continue
+							await tx.tickets.delete({ where: { id: et.id } });
+						}
+
+						if (!user) {
+							// user not found - throw error
+							throw new Error("Gifted user not found");
+						}
+
+						const ticket = await tx.tickets.create({
+							data: {
+								eventId: input.eventId,
+								teamId: input.teamId,
+								userId: input.userId,
+								seatId: input.seatId,
+								type: TicketType.GIFT,
+								expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes from now
+								state: TicketState.PENDING,
+								bearer: {
+									name: user.name,
+									email: user.email,
+									phone: user.phone,
+								},
+							},
+						});
+
+						if (ticket) {
+							// Update event seat to mark seat as unavailable
+							const eventSeat = await tx.eventSeats.update({
+								where: {
+									id: input.seatId,
+									eventId: input.eventId,
+								},
+								data: {
+									isAvailable: false,
+								},
+							});
+
+							const eventSeats = await tx.eventSeats.findMany({
+								where: {
+									eventId: input.eventId,
+								},
+								select: {
+									id: true,
+									seatId: true,
+									eventId: true,
+									category: true,
+									price: true,
+									isAvailable: true,
+									seat: {
+										select: {
+											label: true,
+											section: {
+												select: {
+													id: true,
+													name: true,
+													svgPathData: true,
+												},
 											},
 										},
 									},
 								},
-							},
-						});
+							});
 
-						if (eventSeat && eventSeats) {
-							const seatingPlan: Record<string, Seat> = eventSeats.reduce(
-								(acc, seat) => {
-									acc[seat.seatId] = {
-										isAvailable: seat.isAvailable,
-										price: seat.price,
-										label: seat.seat.label,
-										category: seat.category,
-										section: seat.seat.section,
-									};
-									return acc;
-								},
-								{} as Record<string, Seat>,
-							);
+							if (eventSeat && eventSeats) {
+								const seatingPlan: Record<string, Seat> = eventSeats.reduce(
+									(acc, seat) => {
+										acc[seat.seatId] = {
+											isAvailable: seat.isAvailable,
+											price: seat.price,
+											label: seat.seat.label,
+											category: seat.category,
+											section: seat.seat.section,
+										};
+										return acc;
+									},
+									{} as Record<string, Seat>,
+								);
 
-							if (eventSeats.length > 0) {
-								sseManager.broadcastSeatingUpdate(input.eventId, seatingPlan);
+								if (eventSeats.length > 0) {
+									sseManager.broadcastSeatingUpdate(input.eventId, seatingPlan);
+								}
 							}
-						}
 
-						return {
-							success: true,
-							message: "Ticket created successfully",
-							ticket,
-						};
-					}
-				}, { timeout: 30000 });
+							return {
+								success: true,
+								message: "Ticket created successfully",
+								ticket,
+							};
+						}
+					},
+					{ timeout: 30000 },
+				);
 			} catch (error) {
 				logger.error("Failed to create ticket", error, {
 					operation: "createGiftTicket",
@@ -367,89 +370,91 @@ export const ticketRouter = t.router({
 		)
 		.mutation(async ({ input }) => {
 			try {
-				return await prisma.$transaction(async (tx) => {
-					const user = await tx.users.findUnique({
-						where: {
-							id: input.userId,
-						},
-					});
-
-					if (!user) {
-						// user not found - throw error
-						throw new Error("User not found");
-					}
-
-					const uts = await tx.tickets.findMany({
-						where: {
-							userId: input.userId,
-							state: {
-								in: [TicketState.PENDING, TicketState.PAID],
-							},
-							eventId: input.eventId,
-						},
-					});
-
-					if (uts.length + input.group.length > 14) {
-						// user has reached the limit of 14 tickets - throw error
-						throw new Error(`Group size exceeds the limit of 14 tickets. Only ${14 - uts.length} tickets left.`);
-					}
-
-					let tickets: Tickets[] = [];
-
-					const group = [...input.group];
-
-					group.push({
-						teamId: input.teamId,
-						seatId: input.seatId,
-						bearer: {
-							name: user.name,
-							email: user.email,
-							phone: user.phone,
-						},
-					});
-
-					for (const member of group) {
-						const et = await tx.tickets.findUnique({
+				return await prisma.$transaction(
+					async (tx) => {
+						const user = await tx.users.findUnique({
 							where: {
-								seatId_eventId: {
-									seatId: member.seatId,
-									eventId: input.eventId,
-								},
+								id: input.userId,
 							},
 						});
 
-						if (et && et.state !== TicketState.CANCELLED) {
-							// exists and not cancelled - throw error
-							throw new Error("Seat is already booked");
+						if (!user) {
+							// user not found - throw error
+							throw new Error("User not found");
 						}
 
-						if (et && et.state === TicketState.CANCELLED) {
-							// exists and cancelled - delete and continue
-							await tx.tickets.delete({ where: { id: et.id } });
-						}
-
-						if (group.filter((m) => m.seatId === member.seatId).length > 1) {
-							// seat is already booked - throw error
-							throw new Error("Seat is already booked");
-						}
-
-						const ticket = await tx.tickets.create({
-							data: {
-								eventId: input.eventId,
-								teamId: member.teamId,
+						const uts = await tx.tickets.findMany({
+							where: {
 								userId: input.userId,
-								seatId: member.seatId,
-								type: TicketType.GROUP,
-								expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes from now
-								state: TicketState.PENDING,
-								bearer: member.bearer,
+								state: {
+									in: [TicketState.PENDING, TicketState.PAID],
+								},
+								eventId: input.eventId,
 							},
 						});
 
-						tickets.push(ticket);
-					}
+						if (uts.length + input.group.length > 14) {
+							// user has reached the limit of 14 tickets - throw error
+							throw new Error(
+								`Group size exceeds the limit of 14 tickets. Only ${14 - uts.length} tickets left.`,
+							);
+						}
 
-					if (tickets.length === input.group.length) {
+						let tickets: Tickets[] = [];
+
+						const group = [...input.group];
+
+						group.push({
+							teamId: input.teamId,
+							seatId: input.seatId,
+							bearer: {
+								name: user.name,
+								email: user.email,
+								phone: user.phone,
+							},
+						});
+
+						for (const member of group) {
+							const et = await tx.tickets.findUnique({
+								where: {
+									seatId_eventId: {
+										seatId: member.seatId,
+										eventId: input.eventId,
+									},
+								},
+							});
+
+							if (et && et.state !== TicketState.CANCELLED) {
+								// exists and not cancelled - throw error
+								throw new Error("Seat is already booked");
+							}
+
+							if (et && et.state === TicketState.CANCELLED) {
+								// exists and cancelled - delete and continue
+								await tx.tickets.delete({ where: { id: et.id } });
+							}
+
+							if (group.filter((m) => m.seatId === member.seatId).length > 1) {
+								// seat is already booked - throw error
+								throw new Error("Seat is already booked");
+							}
+
+							const ticket = await tx.tickets.create({
+								data: {
+									eventId: input.eventId,
+									teamId: member.teamId,
+									userId: input.userId,
+									seatId: member.seatId,
+									type: TicketType.GROUP,
+									expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes from now
+									state: TicketState.PENDING,
+									bearer: member.bearer,
+								},
+							});
+
+							tickets.push(ticket);
+						}
+
 						// Update event seats to mark seats as unavailable
 						await Promise.all(
 							tickets.map((ticket) =>
@@ -516,8 +521,9 @@ export const ticketRouter = t.router({
 							message: "Tickets created successfully",
 							tickets,
 						};
-					}
-				}, { timeout: 30000 });
+					},
+					{ timeout: 30000 },
+				);
 			} catch (error) {
 				logger.error("Failed to create ticket", error, {
 					operation: "createGroupTicket",
@@ -559,89 +565,91 @@ export const ticketRouter = t.router({
 		)
 		.mutation(async ({ input }) => {
 			try {
-				return await prisma.$transaction(async (tx) => {
-					const user = await tx.users.findUnique({
-						where: {
-							id: input.userId,
-						},
-					});
-
-					if (!user) {
-						// user not found - throw error
-						throw new Error("User not found");
-					}
-
-					const uts = await tx.tickets.findMany({
-						where: {
-							userId: input.userId,
-							state: {
-								in: [TicketState.PENDING, TicketState.PAID],
-							},
-							eventId: input.eventId,
-						},
-					});
-
-					if (uts.length + input.family.length > 14) {
-						// user has reached the limit of 14 tickets - throw error
-						throw new Error(`Family size exceeds the limit of 14 tickets. Only ${14 - uts.length} tickets left.`);
-					}
-
-					let tickets: Tickets[] = [];
-
-					const family = [...input.family];
-
-					family.push({
-						teamId: input.teamId,
-						seatId: input.seatId,
-						bearer: {
-							name: user.name,
-							email: user.email,
-							phone: user.phone,
-						},
-					});
-
-					for (const member of family) {
-						const et = await tx.tickets.findUnique({
+				return await prisma.$transaction(
+					async (tx) => {
+						const user = await tx.users.findUnique({
 							where: {
-								seatId_eventId: {
-									seatId: member.seatId,
-									eventId: input.eventId,
-								},
+								id: input.userId,
 							},
 						});
 
-						if (et && et.state !== TicketState.CANCELLED) {
-							// exists and not cancelled - throw error
-							throw new Error("Seat is already booked");
+						if (!user) {
+							// user not found - throw error
+							throw new Error("User not found");
 						}
 
-						if (et && et.state === TicketState.CANCELLED) {
-							// exists and cancelled - delete and continue
-							await tx.tickets.delete({ where: { id: et.id } });
-						}
-
-						if (family.filter((m) => m.seatId === member.seatId).length > 1) {
-							// seat is already booked - throw error
-							throw new Error("Seat is already booked");
-						}
-
-						const ticket = await tx.tickets.create({
-							data: {
-								eventId: input.eventId,
-								teamId: member.teamId,
+						const uts = await tx.tickets.findMany({
+							where: {
 								userId: input.userId,
-								seatId: member.seatId,
-								type: TicketType.FAMILY,
-								expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes from now
-								state: TicketState.PENDING,
-								bearer: member.bearer,
+								state: {
+									in: [TicketState.PENDING, TicketState.PAID],
+								},
+								eventId: input.eventId,
 							},
 						});
 
-						tickets.push(ticket);
-					}
+						if (uts.length + input.family.length > 14) {
+							// user has reached the limit of 14 tickets - throw error
+							throw new Error(
+								`Family size exceeds the limit of 14 tickets. Only ${14 - uts.length} tickets left.`,
+							);
+						}
 
-					if (tickets.length === family.length) {
+						let tickets: Tickets[] = [];
+
+						const family = [...input.family];
+
+						family.push({
+							teamId: input.teamId,
+							seatId: input.seatId,
+							bearer: {
+								name: user.name,
+								email: user.email,
+								phone: user.phone,
+							},
+						});
+
+						for (const member of family) {
+							const et = await tx.tickets.findUnique({
+								where: {
+									seatId_eventId: {
+										seatId: member.seatId,
+										eventId: input.eventId,
+									},
+								},
+							});
+
+							if (et && et.state !== TicketState.CANCELLED) {
+								// exists and not cancelled - throw error
+								throw new Error("Seat is already booked");
+							}
+
+							if (et && et.state === TicketState.CANCELLED) {
+								// exists and cancelled - delete and continue
+								await tx.tickets.delete({ where: { id: et.id } });
+							}
+
+							if (family.filter((m) => m.seatId === member.seatId).length > 1) {
+								// seat is already booked - throw error
+								throw new Error("Seat is already booked");
+							}
+
+							const ticket = await tx.tickets.create({
+								data: {
+									eventId: input.eventId,
+									teamId: member.teamId,
+									userId: input.userId,
+									seatId: member.seatId,
+									type: TicketType.FAMILY,
+									expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes from now
+									state: TicketState.PENDING,
+									bearer: member.bearer,
+								},
+							});
+
+							tickets.push(ticket);
+						}
+
 						// Update event seats to mark seats as unavailable
 						await Promise.all(
 							tickets.map((ticket) =>
@@ -708,8 +716,9 @@ export const ticketRouter = t.router({
 							message: "Tickets created successfully",
 							tickets,
 						};
-					}
-				}, { timeout: 30000 });
+					},
+					{ timeout: 30000 },
+				);
 			} catch (error) {
 				logger.error("Failed to create ticket", error, {
 					operation: "createFamilyTicket",
