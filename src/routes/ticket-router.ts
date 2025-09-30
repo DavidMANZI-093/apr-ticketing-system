@@ -630,7 +630,7 @@ export const ticketRouter = t.router({
 										},
 									},
 								});
-								
+
 								if (et && et.state !== TicketState.CANCELLED) {
 									// exists and not cancelled - throw error
 									throw new Error("Seat is already booked");
