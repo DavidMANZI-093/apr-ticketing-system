@@ -8,4 +8,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          curl -f ${{ secrets.API_BASE_URL }}/health | jq || echo "Health check failed but continuing..."
+          curl -f -v ${{ secrets.API_BASE_URL }}/health | jq || echo "Health check failed but continuing..."
