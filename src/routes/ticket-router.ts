@@ -414,46 +414,50 @@ export const ticketRouter = t.router({
 							},
 						});
 
-						for (const member of group) {
-							const et = await tx.tickets.findUnique({
-								where: {
-									seatId_eventId: {
-										seatId: member.seatId,
-										eventId: input.eventId,
+						await Promise.all(
+							group.map(async (member) => {
+								if (
+									group.filter((m) => m.seatId === member.seatId).length > 1
+								) {
+									// seat is already booked - throw error
+									throw new Error("Duplicate seat in group");
+								}
+
+								const et = await tx.tickets.findUnique({
+									where: {
+										seatId_eventId: {
+											seatId: member.seatId,
+											eventId: input.eventId,
+										},
 									},
-								},
-							});
+								});
 
-							if (et && et.state !== TicketState.CANCELLED) {
-								// exists and not cancelled - throw error
-								throw new Error("Seat is already booked");
-							}
+								if (et && et.state !== TicketState.CANCELLED) {
+									// exists and not cancelled - throw error
+									throw new Error("Seat is already booked");
+								}
 
-							if (et && et.state === TicketState.CANCELLED) {
-								// exists and cancelled - delete and continue
-								await tx.tickets.delete({ where: { id: et.id } });
-							}
+								if (et && et.state === TicketState.CANCELLED) {
+									// exists and cancelled - delete and continue
+									await tx.tickets.delete({ where: { id: et.id } });
+								}
 
-							if (group.filter((m) => m.seatId === member.seatId).length > 1) {
-								// seat is already booked - throw error
-								throw new Error("Seat is already booked");
-							}
+								const ticket = await tx.tickets.create({
+									data: {
+										eventId: input.eventId,
+										teamId: member.teamId,
+										userId: input.userId,
+										seatId: member.seatId,
+										type: TicketType.GROUP,
+										expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes from now
+										state: TicketState.PENDING,
+										bearer: member.bearer,
+									},
+								});
 
-							const ticket = await tx.tickets.create({
-								data: {
-									eventId: input.eventId,
-									teamId: member.teamId,
-									userId: input.userId,
-									seatId: member.seatId,
-									type: TicketType.GROUP,
-									expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes from now
-									state: TicketState.PENDING,
-									bearer: member.bearer,
-								},
-							});
-
-							tickets.push(ticket);
-						}
+								tickets.push(ticket);
+							}),
+						);
 
 						// Update event seats to mark seats as unavailable
 						await Promise.all(
@@ -609,46 +613,50 @@ export const ticketRouter = t.router({
 							},
 						});
 
-						for (const member of family) {
-							const et = await tx.tickets.findUnique({
-								where: {
-									seatId_eventId: {
-										seatId: member.seatId,
-										eventId: input.eventId,
+						await Promise.all(
+							family.map(async (member) => {
+								if (
+									family.filter((m) => m.seatId === member.seatId).length > 1
+								) {
+									// seat is already booked - throw error
+									throw new Error("Seat is already booked");
+								}
+
+								const et = await tx.tickets.findUnique({
+									where: {
+										seatId_eventId: {
+											seatId: member.seatId,
+											eventId: input.eventId,
+										},
 									},
-								},
-							});
+								});
+								
+								if (et && et.state !== TicketState.CANCELLED) {
+									// exists and not cancelled - throw error
+									throw new Error("Seat is already booked");
+								}
 
-							if (et && et.state !== TicketState.CANCELLED) {
-								// exists and not cancelled - throw error
-								throw new Error("Seat is already booked");
-							}
+								if (et && et.state === TicketState.CANCELLED) {
+									// exists and cancelled - delete and continue
+									await tx.tickets.delete({ where: { id: et.id } });
+								}
 
-							if (et && et.state === TicketState.CANCELLED) {
-								// exists and cancelled - delete and continue
-								await tx.tickets.delete({ where: { id: et.id } });
-							}
+								const ticket = await tx.tickets.create({
+									data: {
+										eventId: input.eventId,
+										teamId: member.teamId,
+										userId: input.userId,
+										seatId: member.seatId,
+										type: TicketType.FAMILY,
+										expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes from now
+										state: TicketState.PENDING,
+										bearer: member.bearer,
+									},
+								});
 
-							if (family.filter((m) => m.seatId === member.seatId).length > 1) {
-								// seat is already booked - throw error
-								throw new Error("Seat is already booked");
-							}
-
-							const ticket = await tx.tickets.create({
-								data: {
-									eventId: input.eventId,
-									teamId: member.teamId,
-									userId: input.userId,
-									seatId: member.seatId,
-									type: TicketType.FAMILY,
-									expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes from now
-									state: TicketState.PENDING,
-									bearer: member.bearer,
-								},
-							});
-
-							tickets.push(ticket);
-						}
+								tickets.push(ticket);
+							}),
+						);
 
 						// Update event seats to mark seats as unavailable
 						await Promise.all(
