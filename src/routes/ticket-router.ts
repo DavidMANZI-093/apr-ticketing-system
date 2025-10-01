@@ -22,7 +22,7 @@ export const ticketRouter = t.router({
 		.input(
 			z.object({
 				eventId: z.string(),
-				teamId: z.string(),
+				teamId: z.string().optional(),
 				userId: z.string(),
 				seatId: z.string(),
 			}),
@@ -90,7 +90,7 @@ export const ticketRouter = t.router({
 						const ticket = await tx.tickets.create({
 							data: {
 								eventId: input.eventId,
-								teamId: input.teamId,
+								teamId: input.teamId ? input.teamId : null,
 								userId: input.userId,
 								expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes from now
 								state: TicketState.PENDING,
@@ -188,7 +188,7 @@ export const ticketRouter = t.router({
 		.input(
 			z.object({
 				eventId: z.string(),
-				teamId: z.string(),
+				teamId: z.string().optional(),
 				userId: z.string(),
 				seatId: z.string(),
 				bearer: z.email(),
@@ -246,7 +246,7 @@ export const ticketRouter = t.router({
 						const ticket = await tx.tickets.create({
 							data: {
 								eventId: input.eventId,
-								teamId: input.teamId,
+								teamId: input.teamId ? input.teamId : null,
 								userId: input.userId,
 								seatId: input.seatId,
 								type: TicketType.GIFT,
@@ -351,11 +351,11 @@ export const ticketRouter = t.router({
 				eventId: z.string(),
 				userId: z.string(),
 				seatId: z.string(),
-				teamId: z.string(),
+				teamId: z.string().optional(),
 				group: z
 					.array(
 						z.object({
-							teamId: z.string(),
+							teamId: z.string().optional(),
 							seatId: z.string(),
 							bearer: z.object({
 								name: z.string(),
@@ -445,7 +445,7 @@ export const ticketRouter = t.router({
 								const ticket = await tx.tickets.create({
 									data: {
 										eventId: input.eventId,
-										teamId: member.teamId,
+										teamId: member.teamId ? member.teamId : null,
 										userId: input.userId,
 										seatId: member.seatId,
 										type: TicketType.GROUP,
@@ -550,11 +550,11 @@ export const ticketRouter = t.router({
 				eventId: z.string(),
 				userId: z.string(),
 				seatId: z.string(),
-				teamId: z.string(),
+				teamId: z.string().optional(),
 				family: z
 					.array(
 						z.object({
-							teamId: z.string(),
+							teamId: z.string().optional(),
 							seatId: z.string(),
 							bearer: z.object({
 								name: z.string(),
@@ -644,7 +644,7 @@ export const ticketRouter = t.router({
 								const ticket = await tx.tickets.create({
 									data: {
 										eventId: input.eventId,
-										teamId: member.teamId,
+										teamId: member.teamId ? member.teamId : null,
 										userId: input.userId,
 										seatId: member.seatId,
 										type: TicketType.FAMILY,

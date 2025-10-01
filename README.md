@@ -1047,7 +1047,7 @@ ticket.createTicket
 Headers: { Authorization: "Bearer <dev-token>" }
 {
   "eventId": "aa0e8400-e29b-41d4-a716-446655440005",
-  "teamId": "cc0e8400-e29b-41d4-a716-446655440007", 
+  "teamId": "cc0e8400-e29b-41d4-a716-446655440007", // optional
   "userId": "110e8400-e29b-41d4-a716-44665544000b",
   "seatId": "220e8400-e29b-41d4-a716-44665544000c"
 }
@@ -1088,7 +1088,7 @@ ticket.createGiftTicket
 Headers: { Authorization: "Bearer <dev-token>" }
 {
   "eventId": "aa0e8400-e29b-41d4-a716-446655440005",
-  "teamId": "cc0e8400-e29b-41d4-a716-446655440007", 
+  "teamId": "cc0e8400-e29b-41d4-a716-446655440007", // optional 
   "userId": "110e8400-e29b-41d4-a716-44665544000b",
   "seatId": "440e8400-e29b-41d4-a716-44665544000e",
   "bearer": "jane.smith@example.com"
@@ -1130,10 +1130,10 @@ Headers: { Authorization: "Bearer <dev-token>" }
   "eventId": "aa0e8400-e29b-41d4-a716-446655440005",
   "userId": "110e8400-e29b-41d4-a716-44665544000b", // main user (purchaser)
   "seatId": "660e8400-e29b-41d4-a716-446655440010", // main user's seat
-  "teamId": "cc0e8400-e29b-41d4-a716-446655440007", // main user's team
+  "teamId": "cc0e8400-e29b-41d4-a716-446655440007", // main user's team (optional)
   "group": [ // 2-4 additional people (min 2, max 4)
     {
-      "teamId": "cc0e8400-e29b-41d4-a716-446655440007",
+      "teamId": "cc0e8400-e29b-41d4-a716-446655440007", // optional
       "seatId": "770e8400-e29b-41d4-a716-446655440011",
       "bearer": {
         "name": "Jane Doe",
@@ -1142,7 +1142,7 @@ Headers: { Authorization: "Bearer <dev-token>" }
       }
     },
     {
-      "teamId": "dd0e8400-e29b-41d4-a716-446655440008",
+      "teamId": "dd0e8400-e29b-41d4-a716-446655440008", // optional
       "seatId": "880e8400-e29b-41d4-a716-446655440012",
       "bearer": {
         "name": "Bob Smith",
@@ -1229,10 +1229,10 @@ Headers: { Authorization: "Bearer <dev-token>" }
   "eventId": "aa0e8400-e29b-41d4-a716-446655440005",
   "userId": "110e8400-e29b-41d4-a716-44665544000b", // main user (purchaser)
   "seatId": "cc0e8400-e29b-41d4-a716-446655440016", // main user's seat
-  "teamId": "cc0e8400-e29b-41d4-a716-446655440007", // main user's team
+  "teamId": "cc0e8400-e29b-41d4-a716-446655440007", // main user's team (optional)
   "family": [ // 2-6 additional family members (min 2, max 6)
     {
-      "teamId": "cc0e8400-e29b-41d4-a716-446655440007",
+      "teamId": "cc0e8400-e29b-41d4-a716-446655440007", // optional
       "seatId": "dd0e8400-e29b-41d4-a716-446655440017",
       "bearer": {
         "name": "Jane Doe",
@@ -1241,7 +1241,7 @@ Headers: { Authorization: "Bearer <dev-token>" }
       }
     },
     {
-      "teamId": "dd0e8400-e29b-41d4-a716-446655440008",
+      "teamId": "dd0e8400-e29b-41d4-a716-446655440008", // optional
       "seatId": "ee0e8400-e29b-41d4-a716-446655440018",
       "bearer": {
         "name": "Bob Doe",
@@ -1250,7 +1250,7 @@ Headers: { Authorization: "Bearer <dev-token>" }
       }
     },
     {
-      "teamId": "cc0e8400-e29b-41d4-a716-446655440007",
+      "teamId": "cc0e8400-e29b-41d4-a716-446655440007", // optional
       "seatId": "ff0e8400-e29b-41d4-a716-446655440019",
       "bearer": {
         "name": "Alice Doe",
