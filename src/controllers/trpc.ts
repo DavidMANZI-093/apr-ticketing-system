@@ -15,3 +15,6 @@ export const createContext = ({
 });
 
 export const t = initTRPC.context<typeof createContext>().create();
+
+import { metricsMiddleware } from "../middleware/metrics-middleware";
+export const baseProcedure = t.procedure.use(metricsMiddleware);

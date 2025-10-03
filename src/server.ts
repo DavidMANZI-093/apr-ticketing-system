@@ -5,7 +5,7 @@ import { eventRouter } from "./routes/event-router";
 import { prisma } from "./controllers/prisma";
 
 import cron from "node-cron";
-import { OrderStatus, TicketState } from "../generated/prisma";
+import { TicketState } from "../generated/prisma";
 import { ticketRouter } from "./routes/ticket-router";
 import { teamRouter } from "./routes/team-router";
 import { analyticsRouter } from "./routes/analytics-router";
@@ -22,6 +22,14 @@ import {
 } from "./middleware/sse-auth";
 import { Seat } from "./types";
 import cors from "cors";
+import {
+	register,
+	sseActiveConnections,
+	cronJobExecutions,
+	cronJobDuration,
+	expiredTicketsCleaned,
+	eventsDeactivated,
+} from "./utils/metrics";
 
 const appRouter = t.router({
 	event: eventRouter,
@@ -38,6 +46,12 @@ const appRouter = t.router({
 export type AppRouter = typeof appRouter;
 
 const app = express();
+
+// Metrics endpoint - using centralized register from utils/metrics
+app.get("/metrics", async (req, res) => {
+	res.set("Content-Type", register.contentType);
+	res.end(await register.metrics());
+});
 
 app.use(
 	"/trpc",
@@ -137,6 +151,9 @@ app.get(
 			// Add connection to manager
 			sseManager.addConnection(eventId, res, req.user?.keyId);
 
+			// Track SSE connection in metrics
+			sseActiveConnections.inc({ event_id: eventId });
+
 			// Send keepalive every 30 seconds
 			const keepAlive = setInterval(() => {
 				try {
@@ -149,6 +166,8 @@ app.get(
 			// Cleanup on connection close
 			res.on("close", () => {
 				clearInterval(keepAlive);
+				// Decrement SSE connection metric
+				sseActiveConnections.dec({ event_id: eventId });
 			});
 
 			logger.info("SSE stream established", {
@@ -239,6 +258,7 @@ const scheduleNextCronJob = async () => {
 	cronJob = cron.schedule(
 		`*/${Math.ceil(interval / 60000)} * * * *`,
 		async () => {
+			const cronStartTime = Date.now();
 			try {
 				// Update events that have started to inactive
 				await prisma.$transaction(async (tx) => {
@@ -255,6 +275,7 @@ const scheduleNextCronJob = async () => {
 					});
 
 					if (result.count > 0) {
+						eventsDeactivated.inc(result.count);
 						logger.info(
 							`Deactivated ${result.count} events that have started`,
 							{
@@ -371,6 +392,7 @@ const scheduleNextCronJob = async () => {
 							await delay(50);
 						}
 
+						expiredTicketsCleaned.inc(expiredTickets.length);
 						logger.info(
 							`Cancelled ${expiredTickets.length} expired tickets and released seats across ${eventSeats.count} events`,
 							{
@@ -381,7 +403,20 @@ const scheduleNextCronJob = async () => {
 						);
 					}
 				});
+
+				// Record successful cron execution
+				const cronDuration = (Date.now() - cronStartTime) / 1000;
+				cronJobDuration.observe({ job_name: "ticket_cleanup" }, cronDuration);
+				cronJobExecutions.inc({
+					job_name: "ticket_cleanup",
+					status: "success",
+				});
 			} catch (error) {
+				// Record failed cron execution
+				const cronDuration = (Date.now() - cronStartTime) / 1000;
+				cronJobDuration.observe({ job_name: "ticket_cleanup" }, cronDuration);
+				cronJobExecutions.inc({ job_name: "ticket_cleanup", status: "error" });
+
 				logger.error(
 					"Failed to run cron job for event and ticket cleanup",
 					error,

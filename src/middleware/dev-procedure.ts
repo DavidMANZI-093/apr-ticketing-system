@@ -1,12 +1,13 @@
 import { TRPCError } from "@trpc/server";
-import { t } from "../controllers/trpc";
+import { baseProcedure } from "../controllers/trpc";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 import { checkRateLimit } from "../utils/rate-limiter";
+import { rateLimitHits } from "../utils/metrics";
 
 dotenv.config();
 
-export const devProcedure = t.procedure.use(async ({ ctx, next }) => {
+export const devProcedure = baseProcedure.use(async ({ ctx, next }) => {
 	const token = ctx.req.headers.authorization?.replace("Bearer ", "");
 
 	if (!token) {
@@ -36,6 +37,9 @@ export const devProcedure = t.procedure.use(async ({ ctx, next }) => {
 		const rateLimit = checkRateLimit(payload.keyId, "dev", 300, 3600000); // 300 requests per hour
 
 		if (!rateLimit.allowed) {
+			// Track rate limit hits
+			rateLimitHits.inc({ role: "dev" });
+
 			throw new TRPCError({
 				code: "TOO_MANY_REQUESTS",
 				message: `Rate limit exceeded. Reset at ${new Date(rateLimit.resetTime).toISOString()}`,

@@ -1,6 +1,7 @@
 import { Response } from "express";
 import { logger } from "./logger";
 import { Seat } from "../types";
+import { sseMessagesSent } from "./metrics";
 
 interface SSEConnection {
 	res: Response;
@@ -141,6 +142,8 @@ class SSEManager {
 		eventConnections.forEach((connection) => {
 			try {
 				connection.res.write(`data: ${message}\n\n`);
+				// Track SSE message sent
+				sseMessagesSent.inc({ event_id: eventId, message_type: "seatingPlan" });
 			} catch (error) {
 				logger.error("Failed to send SSE message", error, {
 					operation: "sseBroadcast",
@@ -194,6 +197,8 @@ class SSEManager {
 		eventConnections.forEach((connection) => {
 			try {
 				connection.res.write(`data: ${message}\n\n`);
+				// Track SSE message sent
+				sseMessagesSent.inc({ event_id: eventId, message_type: "seatUpdate" });
 			} catch (error) {
 				logger.error("Failed to send SSE seat update", error, {
 					operation: "sseSeatUpdate",

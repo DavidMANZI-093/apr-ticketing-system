@@ -1,11 +1,11 @@
 import { TRPCError } from "@trpc/server";
-import { t } from "../controllers/trpc";
+import { baseProcedure } from "../controllers/trpc";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 
 dotenv.config();
 
-export const alphaProcedure = t.procedure.use(async ({ ctx, next }) => {
+export const alphaProcedure = baseProcedure.use(async ({ ctx, next }) => {
 	const token = ctx.req.headers.authorization?.replace("Bearer ", "");
 
 	if (!token) {
