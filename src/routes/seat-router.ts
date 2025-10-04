@@ -208,7 +208,7 @@ export const seatRouter = t.router({
 								seatId: seat.seatId,
 								price: seat.price,
 								category: seat.category,
-								available: true,
+								isAvailable: true,
 							};
 						}),
 						skipDuplicates: true,
