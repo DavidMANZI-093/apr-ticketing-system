@@ -99,11 +99,21 @@ Expected response:
 
 ### Check Metrics Endpoint
 
+Metrics are now protected by Alpha authentication. First get an Alpha token:
+
 ```bash
-curl http://localhost:3000/metrics
+# Login to get Alpha token
+curl -X POST http://localhost:3000/trpc/alpha.login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"your-alpha-username","password":"your-password","phrase":"your-phrase"}'
+
+# Use token to access metrics
+curl -X POST http://localhost:3000/trpc/alpha.getMetrics \
+  -H "Authorization: Bearer <your-alpha-token>" \
+  -H "Content-Type: application/json"
 ```
 
-Should return Prometheus-formatted metrics.
+Should return Prometheus-formatted metrics in the response.
 
 ## Development Workflow
 

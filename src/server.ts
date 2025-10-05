@@ -64,11 +64,7 @@ app.use(
 	}),
 );
 
-// Metrics endpoint - using centralized register from utils/metrics
-app.get("/metrics", async (req, res) => {
-	res.set("Content-Type", register.contentType);
-	res.end(await register.metrics());
-});
+// Metrics endpoint moved to alpha router for authentication
 
 // SSE endpoint for live seat updates
 app.get(

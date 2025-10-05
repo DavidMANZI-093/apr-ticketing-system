@@ -96,7 +96,7 @@ Production-ready observability with Prometheus metrics covering:
 ```
 tRPC API: http://localhost:3000/trpc
 SSE Streams: http://localhost:3000/events
-Metrics: http://localhost:3000/metrics
+Metrics: http://localhost:3000/trpc/alpha.getMetrics (Alpha auth required)
 Health: http://localhost:3000/health
 ```
 

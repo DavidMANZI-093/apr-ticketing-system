@@ -201,4 +201,28 @@ export const alphaRouter = t.router({
 				};
 			}
 		}),
+
+	// Get Metrics (Prometheus)
+	getMetrics: alphaProcedure.query(async () => {
+		try {
+			const { register } = await import("../utils/metrics");
+			const metrics = await register.metrics();
+			
+			return {
+				success: true,
+				message: "Metrics retrieved successfully",
+				metrics,
+				contentType: register.contentType,
+			};
+		} catch (error) {
+			logger.error("Failed to retrieve metrics", error, {
+				operation: "getMetrics",
+			});
+			return {
+				success: false,
+				message: "Failed to retrieve metrics",
+				error: error instanceof Error ? error.message : "Unknown error",
+			};
+		}
+	}),
 });

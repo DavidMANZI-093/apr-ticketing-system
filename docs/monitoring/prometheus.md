@@ -4,19 +4,31 @@
 
 ### Basic Configuration
 
-Create a `prometheus.yml` file:
+**Important**: Metrics are now protected by Alpha authentication and available via tRPC endpoint.
 
-```yaml
-global:
-  scrape_interval: 15s
-  evaluation_interval: 15s
+Access metrics via:
+```typescript
+// tRPC Query - Requires Alpha Authentication
+alpha.getMetrics
+Headers: { Authorization: "Bearer <alpha-token>" }
+```
 
-scrape_configs:
-  - job_name: 'apr-ticketing-system'
-    static_configs:
-      - targets: ['localhost:3000']
-    metrics_path: '/metrics'
-    scrape_interval: 15s
+For Prometheus integration, you can:
+1. Use a custom scraping solution that handles tRPC authentication
+2. Set up a monitoring service that periodically fetches and exposes metrics
+3. Use Grafana's tRPC data source (if available)
+
+Example manual metrics fetch:
+```bash
+# Get Alpha token
+curl -X POST http://localhost:3000/trpc/alpha.login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"your-username","password":"your-password","phrase":"your-phrase"}'
+
+# Fetch metrics
+curl -X POST http://localhost:3000/trpc/alpha.getMetrics \
+  -H "Authorization: Bearer <your-alpha-token>" \
+  -H "Content-Type: application/json"
 ```
 
 ### Docker Compose Setup
@@ -257,16 +269,22 @@ METRICS_PORT=3000
 ### Security Considerations
 
 #### Metrics Endpoint Security
-Consider restricting access to `/metrics` endpoint in production:
+Metrics are now protected by Alpha authentication, providing several security benefits:
 
-```javascript
-// Add to server.ts before metrics endpoint
-app.use('/metrics', (req, res, next) => {
-  // Add IP whitelist or authentication
-  const allowedIPs = ['127.0.0.1', '10.0.0.0/8'];
-  // Implementation depends on your security requirements
-  next();
-});
+- **Authentication Required**: Only users with valid Alpha tokens can access metrics
+- **Audit Trail**: All metrics access is logged and tracked
+- **Rate Limiting**: Alpha procedures can be rate-limited if needed
+- **No Direct Exposure**: Metrics are not exposed via direct HTTP endpoint
+
+#### Alpha Token Management
+```bash
+# Generate Alpha token via login
+curl -X POST http://localhost:3000/trpc/alpha.login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"your-username","password":"your-password","phrase":"your-phrase"}'
+
+# Use token for metrics access
+export ALPHA_TOKEN="your-alpha-token"
 ```
 
 #### Network Security

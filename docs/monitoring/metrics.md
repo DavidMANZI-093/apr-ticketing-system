@@ -6,11 +6,21 @@ Comprehensive Prometheus monitoring has been implemented for the APR Ticketing S
 
 ## Metrics Endpoint
 
-```
-GET http://localhost:3000/metrics
+```typescript
+// tRPC Query - Requires Alpha Authentication
+alpha.getMetrics
+Headers: { Authorization: "Bearer <alpha-token>" }
+
+// Success Response:
+{
+  "success": true,
+  "message": "Metrics retrieved successfully", 
+  "metrics": "# HELP trpc_request_duration_seconds Duration of tRPC requests in seconds\n# TYPE trpc_request_duration_seconds histogram\n...",
+  "contentType": "text/plain; version=0.0.4; charset=utf-8"
+}
 ```
 
-Returns Prometheus-formatted metrics in text format.
+**Security Note**: Metrics are now protected by Alpha authentication to prevent unauthorized access to system performance data.
 
 ## Core Infrastructure
 
