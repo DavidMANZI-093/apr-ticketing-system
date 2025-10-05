@@ -64,7 +64,55 @@ app.use(
 	}),
 );
 
-// Metrics endpoint moved to alpha router for authentication
+// Authenticated metrics endpoint for Prometheus/Grafana
+app.get("/metrics", async (req, res) => {
+	try {
+		// Check for Alpha authentication
+		const token = req.headers.authorization?.replace("Bearer ", "");
+		
+		if (!token) {
+			return res.status(401).json({
+				error: "Unauthorized - No token provided"
+			});
+		}
+
+		if (!process.env.ALPHA_JWT_SECRET) {
+			return res.status(500).json({
+				error: "Server configuration error"
+			});
+		}
+
+		// Verify Alpha token
+		const jwt = await import("jsonwebtoken");
+		try {
+			const payload = jwt.verify(token, process.env.ALPHA_JWT_SECRET) as {
+				role: string;
+			};
+			
+			if (payload.role !== "alpha") {
+				return res.status(403).json({
+					error: "Forbidden - Invalid role"
+				});
+			}
+		} catch (error) {
+			return res.status(401).json({
+				error: "Unauthorized - Invalid token"
+			});
+		}
+
+		// Return raw metrics for Prometheus
+		res.set("Content-Type", register.contentType);
+		res.end(await register.metrics());
+		
+	} catch (error) {
+		logger.error("Failed to serve metrics", error, {
+			operation: "metricsEndpoint"
+		});
+		res.status(500).json({
+			error: "Failed to retrieve metrics"
+		});
+	}
+});
 
 // SSE endpoint for live seat updates
 app.get(

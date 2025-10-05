@@ -145,27 +145,7 @@ Headers: { Authorization: "Bearer <alpha-token>" }
 }
 ```
 
-### Get Metrics (Prometheus)
-```typescript
-// tRPC Query - Requires Alpha Authentication
-alpha.getMetrics
-Headers: { Authorization: "Bearer <alpha-token>" }
 
-// Success Response:
-{
-  "success": true,
-  "message": "Metrics retrieved successfully",
-  "metrics": "# HELP trpc_request_duration_seconds Duration of tRPC requests in seconds\n# TYPE trpc_request_duration_seconds histogram\ntrpc_request_duration_seconds_bucket{procedure=\"ticket.createTicket\",status=\"success\",role=\"dev\",le=\"0.005\"} 145\n...",
-  "contentType": "text/plain; version=0.0.4; charset=utf-8"
-}
-
-// Error Response:
-{
-  "success": false,
-  "message": "Failed to retrieve metrics",
-  "error": "Detailed error message"
-}
-```
 
 ## Admin Token Management
 

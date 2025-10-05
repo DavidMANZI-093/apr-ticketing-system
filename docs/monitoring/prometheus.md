@@ -4,31 +4,35 @@
 
 ### Basic Configuration
 
-**Important**: Metrics are now protected by Alpha authentication and available via tRPC endpoint.
+**Important**: Metrics endpoint now requires Alpha authentication.
 
-Access metrics via:
-```typescript
-// tRPC Query - Requires Alpha Authentication
-alpha.getMetrics
-Headers: { Authorization: "Bearer <alpha-token>" }
+Create a `prometheus.yml` file:
+
+```yaml
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'apr-ticketing-system'
+    static_configs:
+      - targets: ['localhost:3000']
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+    authorization:
+      type: Bearer
+      credentials: 'your-alpha-token-here'
 ```
 
-For Prometheus integration, you can:
-1. Use a custom scraping solution that handles tRPC authentication
-2. Set up a monitoring service that periodically fetches and exposes metrics
-3. Use Grafana's tRPC data source (if available)
-
-Example manual metrics fetch:
+**Getting Alpha Token:**
 ```bash
-# Get Alpha token
+# Get Alpha token via login
 curl -X POST http://localhost:3000/trpc/alpha.login \
   -H "Content-Type: application/json" \
   -d '{"username":"your-username","password":"your-password","phrase":"your-phrase"}'
 
-# Fetch metrics
-curl -X POST http://localhost:3000/trpc/alpha.getMetrics \
-  -H "Authorization: Bearer <your-alpha-token>" \
-  -H "Content-Type: application/json"
+# Test metrics access
+curl -H "Authorization: Bearer <your-alpha-token>" http://localhost:3000/metrics
 ```
 
 ### Docker Compose Setup
