@@ -47,12 +47,6 @@ export type AppRouter = typeof appRouter;
 
 const app = express();
 
-// Metrics endpoint - using centralized register from utils/metrics
-app.get("/metrics", async (req, res) => {
-	res.set("Content-Type", register.contentType);
-	res.end(await register.metrics());
-});
-
 app.use(
 	"/trpc",
 	createExpressMiddleware({
@@ -69,6 +63,12 @@ app.use(
 		credentials: true,
 	}),
 );
+
+// Metrics endpoint - using centralized register from utils/metrics
+app.get("/metrics", async (req, res) => {
+	res.set("Content-Type", register.contentType);
+	res.end(await register.metrics());
+});
 
 // SSE endpoint for live seat updates
 app.get(
