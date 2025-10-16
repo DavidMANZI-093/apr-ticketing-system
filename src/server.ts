@@ -29,7 +29,9 @@ import {
 	cronJobDuration,
 	expiredTicketsCleaned,
 	eventsDeactivated,
+	apiKeysRevoked,
 } from "./utils/metrics";
+import { partialDeepStrictEqual } from "assert";
 
 const appRouter = t.router({
 	event: eventRouter,
@@ -69,16 +71,16 @@ app.get("/metrics", async (req, res) => {
 	try {
 		// Check for Alpha authentication
 		const token = req.headers.authorization?.replace("Bearer ", "");
-		
+
 		if (!token) {
 			return res.status(401).json({
-				error: "Unauthorized - No token provided"
+				error: "Unauthorized - No token provided",
 			});
 		}
 
 		if (!process.env.ALPHA_JWT_SECRET) {
 			return res.status(500).json({
-				error: "Server configuration error"
+				error: "Server configuration error",
 			});
 		}
 
@@ -88,28 +90,27 @@ app.get("/metrics", async (req, res) => {
 			const payload = jwt.verify(token, process.env.ALPHA_JWT_SECRET) as {
 				role: string;
 			};
-			
+
 			if (payload.role !== "alpha") {
 				return res.status(403).json({
-					error: "Forbidden - Invalid role"
+					error: "Forbidden - Invalid role",
 				});
 			}
 		} catch (error) {
 			return res.status(401).json({
-				error: "Unauthorized - Invalid token"
+				error: "Unauthorized - Invalid token",
 			});
 		}
 
 		// Return raw metrics for Prometheus
 		res.set("Content-Type", register.contentType);
 		res.end(await register.metrics());
-		
 	} catch (error) {
 		logger.error("Failed to serve metrics", error, {
-			operation: "metricsEndpoint"
+			operation: "metricsEndpoint",
 		});
 		res.status(500).json({
-			error: "Failed to retrieve metrics"
+			error: "Failed to retrieve metrics",
 		});
 	}
 });
@@ -448,6 +449,29 @@ const scheduleNextCronJob = async () => {
 					}
 				});
 
+				// Revoke inactive API keys
+				await prisma.$transaction(async (tx) => {
+					const revokedKeys = await tx.apiKey.updateMany({
+						where: {
+							active: true,
+							revokesAt: {
+								lte: new Date(), // less than or equal to current date
+							},
+						},
+						data: {
+							active: false,
+						},
+					});
+
+					if (revokedKeys.count > 0) {
+						apiKeysRevoked.inc(revokedKeys.count);
+						logger.info(`Revoked ${revokedKeys.count} expired API keys`, {
+							operation: "cronApiKeyRevocation",
+							apiKeysRevoked: revokedKeys.count,
+						});
+					}
+				});
+
 				// Record successful cron execution
 				const cronDuration = (Date.now() - cronStartTime) / 1000;
 				cronJobDuration.observe({ job_name: "ticket_cleanup" }, cronDuration);
@@ -462,7 +486,7 @@ const scheduleNextCronJob = async () => {
 				cronJobExecutions.inc({ job_name: "ticket_cleanup", status: "error" });
 
 				logger.error(
-					"Failed to run cron job for event and ticket cleanup",
+					"Failed to run cron job for event, ticket cleanup, and api key revocation",
 					error,
 					{
 						operation: "cronJobError",

@@ -111,6 +111,7 @@ export const alphaRouter = t.router({
 				const keyRecord = await prisma.apiKey.create({
 					data: {
 						name: input.name,
+						revokesAt: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000), // 15 days
 					},
 				});
 

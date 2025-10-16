@@ -20,12 +20,12 @@ enum UserRole {
 }
 
 model ApiKey {
-  id         String    @id @default(uuid()) @db.Uuid
-  name       String    @db.VarChar(255)
-  active     Boolean   @default(true)
-  createdAt  DateTime  @default(now())
-  revokedAt  DateTime?
-  lastUsedAt DateTime?
+  id        String    @id @default(uuid()) @db.Uuid
+  name      String    @db.VarChar(255)
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @default(now())
+  revokesAt DateTime?
 
   @@index([id, active])
 }
@@ -179,12 +179,12 @@ model Seats {
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
 
-  @@unique([venueId, sectionId, row, number])
-  @@index([venueId, sectionId, row, number])
-
   eventSeats EventSeats[]
   venue      Venues       @relation(fields: [venueId], references: [id])
   section    SeatSections @relation(fields: [sectionId], references: [id])
+
+  @@unique([venueId, sectionId, row, number])
+  @@index([venueId, sectionId, row, number])
 }
 
 model SeatSections {

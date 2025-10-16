@@ -149,3 +149,9 @@ export const eventsDeactivated = new client.Counter({
 	help: "Total number of events deactivated by cron job",
 	registers: [register],
 });
+
+export const apiKeysRevoked = new client.Counter({
+	name: "api_keys_revoked_total",
+	help: "Total number of API keys revoked by cron job",
+	registers: [register],
+});
